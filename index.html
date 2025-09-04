@@ -1,17 +1,29 @@
 <!doctype html>
+<!--
+  index.html - Modifica: schermata principale SOLO 4 cerchi (Allenamento).
+  - Il timer tondo compare solo dopo "Avvia" con animazione di collasso dei 4 cerchi.
+  - Picker "Giri": singola wheel centrale.
+  - Slider (Timer | Allenamento) visibile nella topbar.
+-->
 <html lang="it">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Timer</title>
+  <title>Interval Timer</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app" id="app">
-    <h1 class="title">Timer</h1>
+    <header class="topbar">
+      <div class="mode-switch" role="tablist" aria-label="Cambia modalità">
+        <button id="modeTimer" role="tab" aria-selected="false" class="seg">Timer</button>
+        <button id="modeGym" role="tab" aria-selected="true" class="seg selected">Allenamento</button>
+      </div>
+    </header>
 
-    <section class="timer-area">
-      <!-- SVG circular ring -->
+    <!-- TIMER STANDARD (nascosto finché non si avvia una sequenza) -->
+    <section class="timer-area" id="standardArea" hidden>
+      <div class="phase-label" id="phaseLabel" hidden aria-live="polite"></div>
       <div class="clock-wrap" id="clockWrap" role="button" aria-label="Apri selettore tempo"
            tabindex="0">
         <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
@@ -27,23 +39,61 @@
         <button id="stopBtn" class="btn secondary" hidden>Ferma</button>
       </div>
 
-      <p class="hint">Clicca il cerchio per impostare minuti e secondi</p>
+      <p class="hint">Tocca il cerchio per impostare minuti e secondi</p>
+    </section>
+
+    <!-- GYM / INTERVAL SETUP (visibile di default) -->
+    <section class="gym-area" id="gymArea" aria-labelledby="gymTitle">
+      <h2 id="gymTitle" class="visually-hidden">Impostazioni Allenamento</h2>
+      <div class="gym-grid" id="gymGrid">
+        <!-- Prep -->
+        <button class="circle-small" id="prepCircle" role="button" tabindex="0"
+                aria-label="Imposta Preparazione">
+          <span class="circle-title">Preparazione</span>
+          <span class="circle-value" id="prepValue">00:10</span>
+        </button>
+        <!-- Work -->
+        <button class="circle-small" id="workCircle" role="button" tabindex="0"
+                aria-label="Imposta Work">
+          <span class="circle-title">Work</span>
+          <span class="circle-value" id="workValue">00:30</span>
+        </button>
+        <!-- Rest -->
+        <button class="circle-small" id="restCircle" role="button" tabindex="0"
+                aria-label="Imposta Rest">
+          <span class="circle-title">Rest</span>
+          <span class="circle-value" id="restValue">00:20</span>
+        </button>
+        <!-- Rounds -->
+        <button class="circle-small" id="roundsCircle" role="button" tabindex="0"
+                aria-label="Imposta Giri">
+          <span class="circle-title">Giri</span>
+          <span class="circle-value" id="roundsValue">3</span>
+        </button>
+      </div>
+
+      <div class="controls">
+        <button id="gymStartBtn" class="btn primary">Avvia</button>
+      </div>
+      <p class="hint">Tocca un cerchio per modificare; poi Avvia.</p>
     </section>
 
     <!-- Modal / picker -->
     <div id="pickerOverlay" class="overlay" hidden>
-      <div class="picker" role="dialog" aria-modal="true" aria-label="Selettore tempo">
+      <div class="picker" role="dialog" aria-modal="true" aria-label="Selettore">
         <header class="picker-header">
-          <h2>Imposta tempo</h2>
+          <h2 id="pickerTitle">Imposta</h2>
         </header>
-        <div class="wheels">
-          <div class="wheel-col">
-            <div class="wheel-label">Minuti</div>
-            <div class="wheel" id="minutesWheel" tabindex="0" aria-label="Seleziona minuti"></div>
-          </div>
-          <div class="wheel-col">
-            <div class="wheel-label">Secondi</div>
-            <div class="wheel" id="secondsWheel" tabindex="0" aria-label="Seleziona secondi"></div>
+        <div class="picker-body">
+          <div class="wheels" id="wheels">
+            <div class="wheel-col" id="minutesCol">
+              <div class="wheel-label" id="minutesLabel">Minuti</div>
+              <div class="wheel" id="minutesWheel" tabindex="0" aria-label="Seleziona minuti"></div>
+            </div>
+            <div class="wheel-col" id="secondsCol">
+              <div class="wheel-label" id="secondsLabel">Secondi</div>
+              <div class="wheel" id="secondsWheel" tabindex="0" aria-label="Seleziona secondi"></div>
+            </div>
           </div>
         </div>
 
