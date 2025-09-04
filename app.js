@@ -844,10 +844,6 @@
   });
 
   // Cleanup on page unload
-  /* INIT DEFAULT MODE */
-  setMode('gym');
-  requestAnimationFrame(()=> setMode('gym'));
-
   window.addEventListener('beforeunload', () => {
     if (rafId) cancelAnimationFrame(rafId);
     releaseWakeLock();
