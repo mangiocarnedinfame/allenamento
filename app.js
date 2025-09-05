@@ -172,6 +172,10 @@
     }
 
     container._scrollHandler = () => {
+      const y = container.scrollTop;
+      const value = Math.min(max, Math.max(0, Math.round(y / itemH)));
+      markSelected(list, value);
+      onSelect(value);
       if (state.scrollTimeout) clearTimeout(state.scrollTimeout);
       state.scrollTimeout = setTimeout(snap, 120);
     };
