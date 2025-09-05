@@ -251,8 +251,8 @@ body{
   -webkit-backface-visibility: hidden;
 }
 .spacer{ visibility:hidden; height:var(--wheel-item-h); scroll-snap-align: none !important; }
-.wheel::after{
-  content:"";
+.wheel-wrap{ position:relative; width:100%; }
+.wheel-highlight{
   position:absolute;
   left:12px; right:12px;
   height:var(--wheel-item-h);
