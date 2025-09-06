@@ -336,13 +336,13 @@ body{
 
 @media (max-width:520px){
   :root{ --wheel-item-h: 100px; --wheel-font-size:64px; --size:300px; }
-  .wheel{ height: calc(100vh - 210px) }
+  .wheel-container { height: calc(100vh - 210px) }
   .time-label{ font-size:48px }
 }
 @media (max-width:360px){
   .wheels{ flex-direction:column; gap:12px; padding:0 20px; }
   .wheel-col{ width:100%; max-width:none; min-width:unset }
-  .wheel{ height: calc(100vh - 200px) }
+  .wheel-container { height: calc(100vh - 200px) }
   :root{ --wheel-item-h: 64px; --wheel-font-size:36px }
 }
 
