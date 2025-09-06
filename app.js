@@ -1,4 +1,4 @@
-// app.js - Modifica: home solo 4 cerchi; animazione collasso verso il centro all'Avvio; wheel 'Giri' singola e centrata.
+// app.js - Fixed: stabilized wheel highlighting and selection based on vertical position
 (() => {
   // ----------------------------- DOM -----------------------------
   const app = document.getElementById('app');
@@ -70,13 +70,13 @@
 
   // Picker state
   let isPickerOpen = false;
-  let pickerContext = 'standard-time'; // 'standard-time' | 'prep' | 'work' | 'rest' | 'rounds'
-  let pickerMode = 'time'; // 'time' | 'integer'
+  let pickerContext = 'standard-time';
+  let pickerMode = 'time';
 
-  // Wheel state helpers
+  // Wheel state helpers - enhanced for position tracking
   const wheelState = {
-    minutes: { locked:false, initialized:false, scrollTimeout:null },
-    seconds: { locked:false, initialized:false, scrollTimeout:null }
+    minutes: { locked: false, initialized: false, scrollTimeout: null, currentValue: 0 },
+    seconds: { locked: false, initialized: false, scrollTimeout: null, currentValue: 0 }
   };
 
   // Gym state
@@ -112,10 +112,20 @@
     phaseLabel.textContent = text;
   }
 
-  // ----------------------------- Wheel (picker) -----------------------------
+  // ----------------------------- Enhanced Wheel System -----------------------------
   function cleanupListeners(container){
-    if (container._scrollHandler){ container.removeEventListener('scroll', container._scrollHandler); container._scrollHandler=null; }
-    if (container._keyHandler){ container.removeEventListener('keydown', container._keyHandler); container._keyHandler=null; }
+    if (container._scrollHandler){ 
+      container.removeEventListener('scroll', container._scrollHandler); 
+      container._scrollHandler = null; 
+    }
+    if (container._keyHandler){ 
+      container.removeEventListener('keydown', container._keyHandler); 
+      container._keyHandler = null; 
+    }
+    if (container._scrollUpdateRAF) {
+      cancelAnimationFrame(container._scrollUpdateRAF);
+      container._scrollUpdateRAF = null;
+    }
   }
 
   function buildWheel(container, max){
@@ -125,7 +135,7 @@
     ul.className = 'list';
 
     // Create items 0..max
-    for (let i=0;i<=max;i++){
+    for (let i = 0; i <= max; i++){
       const li = document.createElement('li');
       li.className = 'wheel-item';
       li.textContent = i.toString().padStart(2,'0');
@@ -133,55 +143,161 @@
       ul.appendChild(li);
     }
 
-    // Spacers for center alignment
-    const sample = document.createElement('li');
-    sample.className='wheel-item';
-    sample.textContent='00';
     container.appendChild(ul);
+
+    // Calculate spacing for center alignment
     const itemH = 128; // sync with CSS var
     const containerH = Math.max(0, container.getBoundingClientRect().height) || (window.innerHeight - 220);
-    const spacerH = Math.max(0, Math.round((containerH - itemH)/2));
+    const spacerH = Math.max(0, Math.round((containerH - itemH) / 2));
 
-    const topSpacer = document.createElement('li'); topSpacer.className='spacer'; topSpacer.style.height = `${spacerH}px`;
-    const bottomSpacer = document.createElement('li'); bottomSpacer.className='spacer'; bottomSpacer.style.height = `${spacerH}px`;
+    const topSpacer = document.createElement('li'); 
+    topSpacer.className = 'spacer'; 
+    topSpacer.style.height = `${spacerH}px`;
+    
+    const bottomSpacer = document.createElement('li'); 
+    bottomSpacer.className = 'spacer'; 
+    bottomSpacer.style.height = `${spacerH}px`;
+    
     ul.insertBefore(topSpacer, ul.firstChild);
     ul.appendChild(bottomSpacer);
 
     return ul;
   }
 
-  function markSelected(list, value){
-    const items = list.querySelectorAll('.wheel-item');
-    items.forEach(it => it.classList.toggle('selected', Number(it.dataset.value) === value));
+  // Enhanced selection system based on scroll position
+  function updateWheelSelection(container) {
+    if (!container || !container.querySelector) return;
+    
+    const items = container.querySelectorAll('.wheel-item');
+    if (items.length === 0) return;
+
+    const itemH = 128;
+    const containerRect = container.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+    
+    let selectedIndex = -1;
+    let minDistance = Infinity;
+
+    // Find the item closest to center
+    items.forEach((item, index) => {
+      const itemRect = item.getBoundingClientRect();
+      const itemCenterY = itemRect.top + itemRect.height / 2;
+      const distance = Math.abs(itemCenterY - centerY);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        selectedIndex = index;
+      }
+    });
+
+    // Update visual selection and store current value
+    items.forEach((item, index) => {
+      const isSelected = index === selectedIndex;
+      item.classList.toggle('selected', isSelected);
+      
+      if (isSelected) {
+        const value = parseInt(item.dataset.value);
+        if (container === minutesWheel) {
+          wheelState.minutes.currentValue = value;
+          container._value = value;
+        } else if (container === secondsWheel) {
+          wheelState.seconds.currentValue = value;
+          container._value = value;
+        }
+      }
+    });
+
+    return selectedIndex >= 0 ? parseInt(items[selectedIndex].dataset.value) : 0;
   }
 
   function setupWheel(container, list, max, onSelect){
     const state = container === minutesWheel ? wheelState.minutes : wheelState.seconds;
     const itemH = 128;
 
-    function snap(){
-      const y = container.scrollTop;
-      const idx = Math.round((y / itemH));
-      const value = Math.min(max, Math.max(0, idx));
-      const targetTop = value * itemH;
-      container.classList.add('smooth-scroll');
-      container.scrollTop = targetTop;
-      setTimeout(()=> container.classList.remove('smooth-scroll'), 180);
-      onSelect(value);
-      markSelected(list, value);
+    // Smooth scrolling snap function
+    function snapToValue() {
+      const currentScrollTop = container.scrollTop;
+      const targetIndex = Math.round(currentScrollTop / itemH);
+      const clampedIndex = Math.min(max, Math.max(0, targetIndex));
+      const targetScrollTop = clampedIndex * itemH;
+      
+      // Only snap if we're not already there
+      if (Math.abs(currentScrollTop - targetScrollTop) > 1) {
+        container.classList.add('smooth-scroll');
+        container.scrollTop = targetScrollTop;
+        setTimeout(() => {
+          container.classList.remove('smooth-scroll');
+        }, 200);
+      }
+      
+      // Update selection and notify
+      const selectedValue = updateWheelSelection(container);
+      onSelect(selectedValue);
     }
 
-    container._scrollHandler = () => {
-      if (state.scrollTimeout) clearTimeout(state.scrollTimeout);
-      state.scrollTimeout = setTimeout(snap, 120);
-    };
-    container.addEventListener('scroll', container._scrollHandler);
+    // Continuous scroll handler with RAF for smooth updates
+    function onScroll() {
+      // Cancel any existing RAF
+      if (container._scrollUpdateRAF) {
+        cancelAnimationFrame(container._scrollUpdateRAF);
+      }
+      
+      // Update selection immediately for visual feedback
+      container._scrollUpdateRAF = requestAnimationFrame(() => {
+        updateWheelSelection(container);
+        
+        // Clear existing snap timeout
+        if (state.scrollTimeout) {
+          clearTimeout(state.scrollTimeout);
+        }
+        
+        // Set new snap timeout
+        state.scrollTimeout = setTimeout(snapToValue, 150);
+      });
+    }
 
+    container._scrollHandler = onScroll;
+    container.addEventListener('scroll', container._scrollHandler, { passive: true });
+
+    // Enhanced keyboard navigation
     container._keyHandler = (e) => {
-      if (e.key === 'ArrowUp'){ e.preventDefault(); const v = Math.max(0, (container._value||0)-1); container._value=v; container.scrollTop = v*itemH; onSelect(v); markSelected(list,v); }
-      if (e.key === 'ArrowDown'){ e.preventDefault(); const v = Math.min(max, (container._value||0)+1); container._value=v; container.scrollTop = v*itemH; onSelect(v); markSelected(list,v); }
+      const currentValue = container._value || 0;
+      
+      if (e.key === 'ArrowUp') { 
+        e.preventDefault(); 
+        const newValue = Math.max(0, currentValue - 1);
+        container._value = newValue;
+        container.scrollTop = newValue * itemH;
+        updateWheelSelection(container);
+        onSelect(newValue);
+      }
+      if (e.key === 'ArrowDown') { 
+        e.preventDefault(); 
+        const newValue = Math.min(max, currentValue + 1);
+        container._value = newValue;
+        container.scrollTop = newValue * itemH;
+        updateWheelSelection(container);
+        onSelect(newValue);
+      }
     };
     container.addEventListener('keydown', container._keyHandler);
+
+    // Initial selection update
+    setTimeout(() => updateWheelSelection(container), 0);
+  }
+
+  // Set initial wheel position and selection
+  function setWheelValue(container, value, max) {
+    const clampedValue = Math.min(max, Math.max(0, value));
+    const itemH = 128;
+    
+    container._value = clampedValue;
+    container.scrollTop = clampedValue * itemH;
+    
+    // Update selection after scroll position is set
+    requestAnimationFrame(() => {
+      updateWheelSelection(container);
+    });
   }
 
   function trapFocus(modalRoot){
@@ -216,13 +332,14 @@
       secondsCol.hidden = true;
       wheels.classList.add('one-col');
 
-      // Build only minutes wheel 0..99, clamp later
       const list = buildWheel(minutesWheel, 99);
       const current = Math.min(99, Math.max(1, gym.rounds));
-      minutesWheel._value = current;
-      const itemH = 128; minutesWheel.scrollTop = current*itemH;
-      markSelected(list, current);
-      setupWheel(minutesWheel, list, 99, v => { minutesWheel._value = v; });
+      
+      setupWheel(minutesWheel, list, 99, (v) => {
+        wheelState.minutes.currentValue = v;
+      });
+      
+      setWheelValue(minutesWheel, current, 99);
     } else {
       pickerMode = 'time';
       wheels.classList.remove('one-col');
@@ -239,19 +356,21 @@
       const minList = buildWheel(minutesWheel, MAX_MIN);
       const secList = buildWheel(secondsWheel, MAX_SEC);
 
-      let initMin=0, initSec=0;
+      let initMin = 0, initSec = 0;
       if (ctx === 'standard-time'){ initMin = selectedMin; initSec = selectedSec; }
       if (ctx === 'prep'){ initMin = Math.floor(gym.prepSec/60); initSec = gym.prepSec%60; }
       if (ctx === 'work'){ initMin = Math.floor(gym.workSec/60); initSec = gym.workSec%60; }
       if (ctx === 'rest'){ initMin = Math.floor(gym.restSec/60); initSec = gym.restSec%60; }
 
-      const itemH = 128;
-      minutesWheel._value = initMin; secondsWheel._value = initSec;
-      minutesWheel.scrollTop = initMin*itemH; secondsWheel.scrollTop = initSec*itemH;
-      markSelected(minList, initMin); markSelected(secList, initSec);
+      setupWheel(minutesWheel, minList, MAX_MIN, (v) => {
+        wheelState.minutes.currentValue = v;
+      });
+      setupWheel(secondsWheel, secList, MAX_SEC, (v) => {
+        wheelState.seconds.currentValue = v;
+      });
 
-      setupWheel(minutesWheel, minList, MAX_MIN, v => { minutesWheel._value = v; });
-      setupWheel(secondsWheel, secList, MAX_SEC, v => { secondsWheel._value = v; });
+      setWheelValue(minutesWheel, initMin, MAX_MIN);
+      setWheelValue(secondsWheel, initSec, MAX_SEC);
     }
 
     isPickerOpen = true;
@@ -273,16 +392,16 @@
 
   confirmPicker.addEventListener('click', () => {
     if (pickerMode === 'integer' && pickerContext === 'rounds'){
-      let v = Math.max(1, Math.min(99, minutesWheel._value ?? gym.rounds));
+      let v = Math.max(1, Math.min(99, wheelState.minutes.currentValue || gym.rounds));
       gym.rounds = v;
       updateGymUI();
       closePicker();
       return;
     }
 
-    const m = minutesWheel._value ?? 0;
-    const s = secondsWheel._value ?? 0;
-    const secs = m*60 + s;
+    const m = wheelState.minutes.currentValue || 0;
+    const s = wheelState.seconds.currentValue || 0;
+    const secs = m * 60 + s;
 
     if (pickerContext === 'standard-time'){
       if (secs <= 0){
@@ -474,6 +593,52 @@
     if (gym.active){
       gym.active = false;
       phaseLabel.hidden = true;
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (rafId) return;
+    if (isPaused) resumeTimer(); else startTimer();
+  });
+  stopBtn.addEventListener('click', stopTimer);
+
+  clockWrap.addEventListener('click', () => {
+    if (rafId) { pauseTimer(); }
+    else if (isPaused) { resumeTimer(); }
+    else { openPickerFor('standard-time'); }
+  });
+  clockWrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      if (rafId) pauseTimer();
+      else if (isPaused) resumeTimer();
+      else openPickerFor('standard-time');
+    }
+  });
+
+  function attachOpen(el, ctx){
+    el.addEventListener('click', () => { openPickerFor(ctx); });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openPickerFor(ctx); }
+    });
+  }
+  attachOpen(prepCircle, 'prep');
+  attachOpen(workCircle, 'work');
+  attachOpen(restCircle, 'rest');
+  attachOpen(roundsCircle, 'rounds');
+  gymStartBtn.addEventListener('click', startGym);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePicker(); });
+  document.addEventListener('keydown', (e) => {
+    if (isPickerOpen && e.key === 'Escape'){ closePicker(); }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    releaseWakeLock();
+    cleanupListeners(minutesWheel);
+    cleanupListeners(secondsWheel);
+    try{ audioCtx?.close?.(); }catch{}
+  });
+})(); = true;
       standardArea.hidden = true;
       gymArea.hidden = false;
       pageTitle.textContent = 'Allenamento';
@@ -543,7 +708,6 @@
   }
 
   function animateGridCollapse(callback){
-    // Ensure we can measure target center
     standardArea.hidden = false;
     const prevVis = standardArea.style.visibility;
     standardArea.style.visibility = 'hidden';
@@ -553,7 +717,6 @@
     const tx = targetRect.left + targetRect.width/2;
     const ty = targetRect.top + targetRect.height/2;
 
-    // restore visibility for now
     standardArea.style.visibility = prevVis || '';
     standardArea.hidden = true;
     standardArea.style.pointerEvents = '';
@@ -568,7 +731,6 @@
       el.classList.add('collapse-anim');
     });
 
-    // After animation end
     setTimeout(() => {
       circles.forEach(el => el.classList.remove('collapse-anim'));
       callback?.();
@@ -586,7 +748,6 @@
     gym.index = -1;
     gym.active = true;
 
-    // Collassa 4 cerchi verso il centro, poi mostra cerchio grande e parte
     gymStartBtn.disabled = true;
     animateGridCollapse(() => {
       gymArea.hidden = true;
@@ -614,50 +775,4 @@
     pageTitle.textContent = 'Allenamento';
     standardArea.hidden = true;
     gymArea.hidden = false;
-    phaseLabel.hidden = true;
-  });
-
-  startBtn.addEventListener('click', () => {
-    if (rafId) return;
-    if (isPaused) resumeTimer(); else startTimer();
-  });
-  stopBtn.addEventListener('click', stopTimer);
-
-  clockWrap.addEventListener('click', () => {
-    if (rafId) { pauseTimer(); }
-    else if (isPaused) { resumeTimer(); }
-    else { openPickerFor('standard-time'); }
-  });
-  clockWrap.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' '){
-      e.preventDefault();
-      if (rafId) pauseTimer();
-      else if (isPaused) resumeTimer();
-      else openPickerFor('standard-time');
-    }
-  });
-
-  function attachOpen(el, ctx){
-    el.addEventListener('click', () => { openPickerFor(ctx); });
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openPickerFor(ctx); }
-    });
-  }
-  attachOpen(prepCircle, 'prep');
-  attachOpen(workCircle, 'work');
-  attachOpen(restCircle, 'rest');
-  attachOpen(roundsCircle, 'rounds');
-  gymStartBtn.addEventListener('click', startGym);
-
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePicker(); });
-  document.addEventListener('keydown', (e) => {
-    if (isPickerOpen && e.key === 'Escape'){ closePicker(); }
-  });
-
-  window.addEventListener('beforeunload', () => {
-    releaseWakeLock();
-    cleanupListeners(minutesWheel);
-    cleanupListeners(secondsWheel);
-    try{ audioCtx?.close?.(); }catch{}
-  });
-})();
+    phaseLabel.hidden
