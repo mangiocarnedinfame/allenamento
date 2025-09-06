@@ -1,13 +1,14 @@
 <!doctype html>
 <!--
-  index.html - Modifica: schermata principale SOLO 4 cerchi (Allenamento).
-  - Il timer tondo compare solo dopo "Avvia" con animazione di collasso dei 4 cerchi.
-  - Picker "Giri": singola wheel centrale.
+  index.html - Wheel stabilizzate con selector fisso centrale
+  - Selector box fisso al centro di ogni wheel
+  - Numeri scorrono attraverso il selector
+  - Evidenziazione in tempo reale durante lo scroll
 -->
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Interval Timer</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -85,13 +86,21 @@
         </header>
         <div class="picker-body">
           <div class="wheels" id="wheels">
+            <!-- Colonna minuti -->
             <div class="wheel-col" id="minutesCol">
               <div class="wheel-label" id="minutesLabel">Minuti</div>
-              <div class="wheel" id="minutesWheel" tabindex="0" aria-label="Seleziona minuti"></div>
+              <div class="wheel-wrapper" style="position:relative;">
+                <div class="wheel" id="minutesWheel" tabindex="0" aria-label="Seleziona minuti"></div>
+                <div class="wheel-selector" aria-hidden="true"></div>
+              </div>
             </div>
+            <!-- Colonna secondi -->
             <div class="wheel-col" id="secondsCol">
               <div class="wheel-label" id="secondsLabel">Secondi</div>
-              <div class="wheel" id="secondsWheel" tabindex="0" aria-label="Seleziona secondi"></div>
+              <div class="wheel-wrapper" style="position:relative;">
+                <div class="wheel" id="secondsWheel" tabindex="0" aria-label="Seleziona secondi"></div>
+                <div class="wheel-selector" aria-hidden="true"></div>
+              </div>
             </div>
           </div>
         </div>
