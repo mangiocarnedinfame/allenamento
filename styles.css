@@ -1,4 +1,4 @@
-/* styles.css - Modifica: home solo 4 cerchi + animazione collasso; wheel singola centrale per 'Giri'. */
+/* styles.css - Fixed: stabilized wheel highlighting based on vertical center position */
 :root{
   --bg: #0f1114;
   --card: #0e1114;
@@ -200,15 +200,37 @@ body{
 }
 .picker-footer .btn { pointer-events: auto; z-index: 1401; }
 
-/* Wheels */
-.wheels{ display:flex; flex-direction:row; gap:18px; justify-content:center; align-items:center; width:100%; max-width:1400px; padding:0 12px; box-sizing:border-box; overflow-x:hidden; }
+/* Enhanced Wheels System - Fixed positioning and stable highlighting */
+.wheels{ 
+  display:flex; 
+  flex-direction:row; 
+  gap:18px; 
+  justify-content:center; 
+  align-items:stretch; 
+  width:100%; 
+  max-width:1400px; 
+  padding:0 12px; 
+  box-sizing:border-box; 
+  overflow:hidden;
+  height:100%;
+}
 .wheels.one-col{ gap:0; justify-content:center; }
-.wheel-col{ flex: 1 1 0; min-width:0; max-width:50%; display:flex; flex-direction:column; gap:8px; align-items:center; }
+.wheel-col{ 
+  flex: 1 1 0; 
+  min-width:0; 
+  max-width:50%; 
+  display:flex; 
+  flex-direction:column; 
+  gap:8px; 
+  align-items:center;
+  height:100%;
+}
 .wheels.one-col .wheel-col{ max-width:560px; flex: 0 1 560px; }
-.wheel-label{ color:var(--muted); font-size:15px; font-weight:700; }
+.wheel-label{ color:var(--muted); font-size:15px; font-weight:700; flex-shrink:0; }
+
 .wheel{
   width:100%;
-  height:calc(100vh - 220px);
+  flex:1;
   border-radius:14px;
   background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.03));
   overflow-y:auto;
@@ -217,7 +239,7 @@ body{
   -webkit-overflow-scrolling: touch;
   transform-style:preserve-3d;
   perspective:900px;
-  padding:24px 0;
+  padding:0;
   position:relative;
   border:1px solid rgba(255,255,255,0.03);
   touch-action: pan-y;
@@ -226,8 +248,43 @@ body{
   scrollbar-width: thin;
   scroll-behavior: auto;
 }
-.wheel.smooth-scroll { scroll-behavior: smooth; }
-.list{ list-style:none; padding:0; margin:0; display:block; width:100%; }
+
+/* Smooth scrolling class for snapping */
+.wheel.smooth-scroll { 
+  scroll-behavior: smooth; 
+}
+
+/* Fixed highlight zone - always centered */
+.wheel::before{
+  content:"";
+  position:absolute;
+  left:12px; 
+  right:12px;
+  height:var(--wheel-item-h);
+  top:calc(50% - (var(--wheel-item-h) / 2));
+  border-radius:12px;
+  pointer-events:none;
+  /* Strong, stationary highlight that stays in center */
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,0.12),
+    0 8px 32px rgba(0,0,0,0.4);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));
+  z-index: 20;
+  opacity: 1;
+  transform: none;
+  backdrop-filter: blur(2px);
+}
+
+.list{ 
+  list-style:none; 
+  padding:0; 
+  margin:0; 
+  display:block; 
+  width:100%; 
+  position:relative;
+}
+
 .wheel-item{
   scroll-snap-stop: always;
   height:var(--wheel-item-h);
@@ -238,9 +295,8 @@ body{
   scroll-snap-align:center;
   user-select:none;
   font-size:var(--wheel-font-size);
-  transition: transform .15s ease, color .15s ease, text-shadow .15s ease, opacity .15s ease;
+  transition: color .2s ease, text-shadow .2s ease, opacity .2s ease;
   transform-origin: center center;
-  will-change: transform, opacity;
   width:100%;
   box-sizing:border-box;
   padding:0 8px;
@@ -249,41 +305,42 @@ body{
   text-overflow:ellipsis;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-}
-.spacer{ visibility:hidden; height:var(--wheel-item-h); scroll-snap-align: none !important; }
-.wheel::after{
-  content:"";
-  position:absolute;
-  left:12px; right:12px;
-  height:var(--wheel-item-h);
-  top:calc(50% - (var(--wheel-item-h) / 2));
-  border-radius:12px;
-  pointer-events:none;
-  /* stronger, stationary highlight */
-  box-shadow:
-    inset 0 0 0 2px rgba(255,255,255,0.08),
-    0 6px 28px rgba(0,0,0,0.35);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));
-  z-index: 20;
-}
-.wheel-item.selected{
-  color: #e8f7f0;
-  /* keep items flat so only numbers move under a fixed highlight */
-  transform: none;
-  background: transparent;
-  text-shadow: 0 6px 22px rgba(0,0,0,0.4);
+  position:relative;
+  z-index: 10;
+  /* Default state: slightly dimmed */
+  opacity: 0.5;
 }
 
+/* Enhanced selected state - based on position, not dynamic class */
+.wheel-item.selected{
+  color: #e8f7f0;
+  opacity: 1;
+  text-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  font-weight: 900;
+  /* No transform - keep items flat so only the fixed highlight provides depth */
+  transform: none;
+  background: transparent;
+  z-index: 15;
+}
+
+/* Spacer elements for proper centering */
+.spacer{ 
+  visibility:hidden; 
+  height:var(--wheel-item-h); 
+  scroll-snap-align: none !important; 
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Responsive adjustments */
 @media (max-width:520px){
   :root{ --wheel-item-h: 100px; --wheel-font-size:64px; --size:300px; }
-  .wheel{ height: calc(100vh - 210px) }
   .time-label{ font-size:48px }
 }
+
 @media (max-width:360px){
   .wheels{ flex-direction:column; gap:12px; padding:0 20px; }
-  .wheel-col{ width:100%; max-width:none; min-width:unset }
-  .wheel{ height: calc(100vh - 200px) }
+  .wheel-col{ width:100%; max-width:none; min-width:unset; flex:1; }
   :root{ --wheel-item-h: 64px; --wheel-font-size:36px }
 }
 
@@ -293,13 +350,7 @@ body{
 /* Ensure any [hidden] element is really hidden (overrides our layout rules) */
 [hidden]{ display:none !important; }
 
-
-
-/* Subtle dim on non-selected items so the fixed highlight feels stable */
-.wheel-item{ opacity: 0.55; }
-.wheel-item.selected{ opacity: 1; }
-
-
+/* Optional magic burst animation */
 .magic-burst{
   position: fixed;
   left: 0; top: 0;
@@ -322,7 +373,6 @@ body{
   }
 }
 
-/* optional ripple ring */
 .magic-burst::after{
   content: "";
   position: absolute; inset: 0;
