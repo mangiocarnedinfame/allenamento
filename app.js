@@ -129,9 +129,9 @@
     const ul = document.createElement('ul');
     ul.className = 'list';
 
-    // Calcola spacer per centrare
+    // Calcola spacer per centrare perfettamente
     const containerH = container.clientHeight || (window.innerHeight - 220);
-    const spacerH = Math.max(0, Math.floor((containerH - ITEM_HEIGHT) / 2));
+    const spacerH = Math.floor((containerH / 2) - (ITEM_HEIGHT / 2));
 
     // Top spacer
     const topSpacer = document.createElement('li');
@@ -163,7 +163,7 @@
     const items = container.querySelectorAll('.wheel-item');
     const scrollTop = container.scrollTop;
     const containerH = container.clientHeight;
-    const centerY = scrollTop + (containerH / 2);
+    const centerY = containerH / 2;
 
     let closestItem = null;
     let closestDist = Infinity;
@@ -172,7 +172,8 @@
     items.forEach(item => {
       const rect = item.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
-      const itemCenterY = rect.top - containerRect.top + (rect.height / 2) + scrollTop;
+      const itemRelativeTop = rect.top - containerRect.top;
+      const itemCenterY = itemRelativeTop + (rect.height / 2);
       const dist = Math.abs(itemCenterY - centerY);
 
       // Rimuovi classi precedenti
@@ -184,11 +185,19 @@
         closestItem = item;
         closestValue = parseInt(item.dataset.value) || 0;
       }
+    });
 
-      // Applica classi in base alla distanza
-      if (dist < ITEM_HEIGHT * 0.5){
+    // Applica classi in base alla distanza
+    items.forEach(item => {
+      const rect = item.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const itemRelativeTop = rect.top - containerRect.top;
+      const itemCenterY = itemRelativeTop + (rect.height / 2);
+      const dist = Math.abs(itemCenterY - centerY);
+
+      if (dist < ITEM_HEIGHT * 0.3){
         item.classList.add('in-center');
-      } else if (dist < ITEM_HEIGHT * 1.5){
+      } else if (dist < ITEM_HEIGHT * 1.2){
         item.classList.add('near-center');
       }
     });
