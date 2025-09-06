@@ -1,4 +1,4 @@
-// app.js - Fixed: stabilized wheel highlighting and selection based on vertical position
+// app.js - Wheel stabilizzate con evidenziazione in tempo reale
 (() => {
   // ----------------------------- DOM -----------------------------
   const app = document.getElementById('app');
@@ -8,7 +8,7 @@
   const modeTimerBtn = document.getElementById('modeTimer');
   const modeGymBtn = document.getElementById('modeGym');
 
-  // Standard timer area (hidden until running)
+  // Standard timer area
   const standardArea = document.getElementById('standardArea');
   const clockWrap = document.getElementById('clockWrap');
   const timeLabel = document.getElementById('timeLabel');
@@ -52,6 +52,7 @@
   // ----------------------------- Config/State -----------------------------
   const MAX_MIN = 59;
   const MAX_SEC = 59;
+  const ITEM_HEIGHT = 128; // Sync with CSS
 
   // Standard timer state
   let selectedMin = 0, selectedSec = 30;
@@ -73,10 +74,10 @@
   let pickerContext = 'standard-time';
   let pickerMode = 'time';
 
-  // Wheel state helpers - enhanced for position tracking
-  const wheelState = {
-    minutes: { locked: false, initialized: false, scrollTimeout: null, currentValue: 0 },
-    seconds: { locked: false, initialized: false, scrollTimeout: null, currentValue: 0 }
+  // Wheel tracking
+  const wheelTracking = {
+    minutes: { rafId: null, currentValue: 0 },
+    seconds: { rafId: null, currentValue: 0 }
   };
 
   // Gym state
@@ -112,240 +113,259 @@
     phaseLabel.textContent = text;
   }
 
-  // ----------------------------- Enhanced Wheel System -----------------------------
-  function cleanupListeners(container){
-    if (container._scrollHandler){ 
-      container.removeEventListener('scroll', container._scrollHandler); 
-      container._scrollHandler = null; 
+  // ----------------------------- Wheel (picker) STABILIZZATO -----------------------------
+  function cleanupWheel(container){
+    const tracking = container === minutesWheel ? wheelTracking.minutes : wheelTracking.seconds;
+    if (tracking.rafId){
+      cancelAnimationFrame(tracking.rafId);
+      tracking.rafId = null;
     }
-    if (container._keyHandler){ 
-      container.removeEventListener('keydown', container._keyHandler); 
-      container._keyHandler = null; 
-    }
-    if (container._scrollUpdateRAF) {
-      cancelAnimationFrame(container._scrollUpdateRAF);
-      container._scrollUpdateRAF = null;
-    }
+    container.innerHTML = '';
   }
 
   function buildWheel(container, max){
-    cleanupListeners(container);
-    container.innerHTML = '';
+    cleanupWheel(container);
+    
     const ul = document.createElement('ul');
     ul.className = 'list';
 
-    // Create items 0..max
+    // Calcola spacer per centrare
+    const containerH = container.clientHeight || (window.innerHeight - 220);
+    const spacerH = Math.max(0, Math.floor((containerH - ITEM_HEIGHT) / 2));
+
+    // Top spacer
+    const topSpacer = document.createElement('li');
+    topSpacer.className = 'spacer';
+    topSpacer.style.height = `${spacerH}px`;
+    ul.appendChild(topSpacer);
+
+    // Items 0..max
     for (let i = 0; i <= max; i++){
       const li = document.createElement('li');
       li.className = 'wheel-item';
-      li.textContent = i.toString().padStart(2,'0');
+      li.textContent = pad(i);
       li.dataset.value = i;
       ul.appendChild(li);
     }
 
-    container.appendChild(ul);
-
-    // Calculate spacing for center alignment
-    const itemH = 128; // sync with CSS var
-    const containerH = Math.max(0, container.getBoundingClientRect().height) || (window.innerHeight - 220);
-    const spacerH = Math.max(0, Math.round((containerH - itemH) / 2));
-
-    const topSpacer = document.createElement('li'); 
-    topSpacer.className = 'spacer'; 
-    topSpacer.style.height = `${spacerH}px`;
-    
-    const bottomSpacer = document.createElement('li'); 
-    bottomSpacer.className = 'spacer'; 
+    // Bottom spacer
+    const bottomSpacer = document.createElement('li');
+    bottomSpacer.className = 'spacer';
     bottomSpacer.style.height = `${spacerH}px`;
-    
-    ul.insertBefore(topSpacer, ul.firstChild);
     ul.appendChild(bottomSpacer);
 
+    container.appendChild(ul);
     return ul;
   }
 
-  // Enhanced selection system based on scroll position
-  function updateWheelSelection(container) {
-    if (!container || !container.querySelector) return;
-    
+  function updateWheelHighlight(container){
+    const tracking = container === minutesWheel ? wheelTracking.minutes : wheelTracking.seconds;
     const items = container.querySelectorAll('.wheel-item');
-    if (items.length === 0) return;
+    const scrollTop = container.scrollTop;
+    const containerH = container.clientHeight;
+    const centerY = scrollTop + (containerH / 2);
 
-    const itemH = 128;
-    const containerRect = container.getBoundingClientRect();
-    const centerY = containerRect.top + containerRect.height / 2;
-    
-    let selectedIndex = -1;
-    let minDistance = Infinity;
+    let closestItem = null;
+    let closestDist = Infinity;
+    let closestValue = 0;
 
-    // Find the item closest to center
-    items.forEach((item, index) => {
-      const itemRect = item.getBoundingClientRect();
-      const itemCenterY = itemRect.top + itemRect.height / 2;
-      const distance = Math.abs(itemCenterY - centerY);
-      
-      if (distance < minDistance) {
-        minDistance = distance;
-        selectedIndex = index;
+    items.forEach(item => {
+      const rect = item.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const itemCenterY = rect.top - containerRect.top + (rect.height / 2) + scrollTop;
+      const dist = Math.abs(itemCenterY - centerY);
+
+      // Rimuovi classi precedenti
+      item.classList.remove('in-center', 'near-center');
+
+      // Trova l'elemento più vicino al centro
+      if (dist < closestDist){
+        closestDist = dist;
+        closestItem = item;
+        closestValue = parseInt(item.dataset.value) || 0;
+      }
+
+      // Applica classi in base alla distanza
+      if (dist < ITEM_HEIGHT * 0.5){
+        item.classList.add('in-center');
+      } else if (dist < ITEM_HEIGHT * 1.5){
+        item.classList.add('near-center');
       }
     });
 
-    // Update visual selection and store current value
-    items.forEach((item, index) => {
-      const isSelected = index === selectedIndex;
-      item.classList.toggle('selected', isSelected);
-      
-      if (isSelected) {
-        const value = parseInt(item.dataset.value);
-        if (container === minutesWheel) {
-          wheelState.minutes.currentValue = value;
-          container._value = value;
-        } else if (container === secondsWheel) {
-          wheelState.seconds.currentValue = value;
-          container._value = value;
-        }
-      }
-    });
-
-    return selectedIndex >= 0 ? parseInt(items[selectedIndex].dataset.value) : 0;
+    tracking.currentValue = closestValue;
+    return closestValue;
   }
 
-  function setupWheel(container, list, max, onSelect){
-    const state = container === minutesWheel ? wheelState.minutes : wheelState.seconds;
-    const itemH = 128;
+  function trackWheel(container){
+    const tracking = container === minutesWheel ? wheelTracking.minutes : wheelTracking.seconds;
+    
+    function update(){
+      updateWheelHighlight(container);
+      tracking.rafId = requestAnimationFrame(update);
+    }
+    
+    tracking.rafId = requestAnimationFrame(update);
+  }
 
-    // Smooth scrolling snap function
-    function snapToValue() {
-      const currentScrollTop = container.scrollTop;
-      const targetIndex = Math.round(currentScrollTop / itemH);
-      const clampedIndex = Math.min(max, Math.max(0, targetIndex));
-      const targetScrollTop = clampedIndex * itemH;
+  function scrollToValue(container, value, smooth = false){
+    const itemH = ITEM_HEIGHT;
+    const targetScroll = value * itemH;
+    
+    if (smooth){
+      container.style.scrollBehavior = 'smooth';
+      container.scrollTop = targetScroll;
+      setTimeout(() => {
+        container.style.scrollBehavior = 'auto';
+      }, 300);
+    } else {
+      container.scrollTop = targetScroll;
+    }
+  }
+
+  function setupWheel(container, list, max, initialValue){
+    const tracking = container === minutesWheel ? wheelTracking.minutes : wheelTracking.seconds;
+    let scrollTimeout = null;
+    let isUserScrolling = false;
+
+    // Posiziona inizialmente
+    scrollToValue(container, initialValue, false);
+    tracking.currentValue = initialValue;
+
+    // Avvia tracking visuale
+    trackWheel(container);
+
+    // Gestione scroll con snap migliorato
+    container.addEventListener('scroll', () => {
+      isUserScrolling = true;
       
-      // Only snap if we're not already there
-      if (Math.abs(currentScrollTop - targetScrollTop) > 1) {
-        container.classList.add('smooth-scroll');
-        container.scrollTop = targetScrollTop;
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (!isUserScrolling) return;
+        
+        // Calcola valore più vicino
+        const scrollTop = container.scrollTop;
+        const value = Math.round(scrollTop / ITEM_HEIGHT);
+        const clampedValue = Math.min(max, Math.max(0, value));
+        
+        // Snap al valore più vicino
+        scrollToValue(container, clampedValue, true);
+        tracking.currentValue = clampedValue;
+        isUserScrolling = false;
+      }, 80); // Ridotto per snap più rapido
+    });
+
+    // Keyboard navigation
+    container.addEventListener('keydown', (e) => {
+      let newValue = tracking.currentValue;
+      
+      if (e.key === 'ArrowUp'){
+        e.preventDefault();
+        newValue = Math.max(0, newValue - 1);
+      } else if (e.key === 'ArrowDown'){
+        e.preventDefault();
+        newValue = Math.min(max, newValue + 1);
+      } else {
+        return;
+      }
+      
+      scrollToValue(container, newValue, true);
+      tracking.currentValue = newValue;
+    });
+
+    // Touch handling per momentum control
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    
+    container.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+      isUserScrolling = true;
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+      const touchEndY = e.changedTouches[0].clientY;
+      const touchEndTime = Date.now();
+      const deltaY = touchEndY - touchStartY;
+      const deltaTime = touchEndTime - touchStartTime;
+      
+      // Se swipe veloce, lascia momentum naturale
+      if (Math.abs(deltaY) > 50 && deltaTime < 200){
+        // Lascia che il momentum naturale faccia il suo corso
         setTimeout(() => {
-          container.classList.remove('smooth-scroll');
-        }, 200);
+          isUserScrolling = false;
+        }, 500);
+      } else {
+        isUserScrolling = false;
       }
-      
-      // Update selection and notify
-      const selectedValue = updateWheelSelection(container);
-      onSelect(selectedValue);
-    }
-
-    // Continuous scroll handler with RAF for smooth updates
-    function onScroll() {
-      // Cancel any existing RAF
-      if (container._scrollUpdateRAF) {
-        cancelAnimationFrame(container._scrollUpdateRAF);
-      }
-      
-      // Update selection immediately for visual feedback
-      container._scrollUpdateRAF = requestAnimationFrame(() => {
-        updateWheelSelection(container);
-        
-        // Clear existing snap timeout
-        if (state.scrollTimeout) {
-          clearTimeout(state.scrollTimeout);
-        }
-        
-        // Set new snap timeout
-        state.scrollTimeout = setTimeout(snapToValue, 150);
-      });
-    }
-
-    container._scrollHandler = onScroll;
-    container.addEventListener('scroll', container._scrollHandler, { passive: true });
-
-    // Enhanced keyboard navigation
-    container._keyHandler = (e) => {
-      const currentValue = container._value || 0;
-      
-      if (e.key === 'ArrowUp') { 
-        e.preventDefault(); 
-        const newValue = Math.max(0, currentValue - 1);
-        container._value = newValue;
-        container.scrollTop = newValue * itemH;
-        updateWheelSelection(container);
-        onSelect(newValue);
-      }
-      if (e.key === 'ArrowDown') { 
-        e.preventDefault(); 
-        const newValue = Math.min(max, currentValue + 1);
-        container._value = newValue;
-        container.scrollTop = newValue * itemH;
-        updateWheelSelection(container);
-        onSelect(newValue);
-      }
-    };
-    container.addEventListener('keydown', container._keyHandler);
-
-    // Initial selection update
-    setTimeout(() => updateWheelSelection(container), 0);
+    }, { passive: true });
   }
 
-  // Set initial wheel position and selection
-  function setWheelValue(container, value, max) {
-    const clampedValue = Math.min(max, Math.max(0, value));
-    const itemH = 128;
-    
-    container._value = clampedValue;
-    container.scrollTop = clampedValue * itemH;
-    
-    // Update selection after scroll position is set
-    requestAnimationFrame(() => {
-      updateWheelSelection(container);
-    });
-  }
+  // Focus trap per modal
+  let trapKeyHandler = null;
+  let lastFocused = null;
 
   function trapFocus(modalRoot){
     lastFocused = document.activeElement;
     const focusable = modalRoot.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])');
     const first = focusable[0];
-    const last = focusable[focusable.length-1];
+    const last = focusable[focusable.length - 1];
+    
     trapKeyHandler = (e) => {
       if (e.key === 'Tab'){
-        if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last?.focus(); }
-        else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first?.focus(); }
+        if (e.shiftKey && document.activeElement === first){
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last){
+          e.preventDefault();
+          first?.focus();
+        }
       }
-      if (e.key === 'Escape'){ closePicker(); }
+      if (e.key === 'Escape'){
+        closePicker();
+      }
     };
+    
     modalRoot.addEventListener('keydown', trapKeyHandler);
-    setTimeout(()=> first?.focus(), 0);
+    setTimeout(() => first?.focus(), 50);
   }
+
   function releaseFocusTrap(){
-    if (trapKeyHandler){ overlay.removeEventListener('keydown', trapKeyHandler); trapKeyHandler = null; }
-    try{ lastFocused?.focus(); }catch{}
+    if (trapKeyHandler){
+      overlay.removeEventListener('keydown', trapKeyHandler);
+      trapKeyHandler = null;
+    }
+    try { lastFocused?.focus(); } catch {}
   }
-  let trapKeyHandler = null;
-  let lastFocused = null;
 
   function openPickerFor(ctx){
     pickerContext = ctx;
+
+    // Cleanup precedente
+    cleanupWheel(minutesWheel);
+    cleanupWheel(secondsWheel);
 
     if (ctx === 'rounds'){
       pickerMode = 'integer';
       pickerTitle.textContent = 'Imposta giri';
       minutesLabel.textContent = 'Giri';
+      
+      // Nascondi colonna secondi e centra minuti
       secondsCol.hidden = true;
       wheels.classList.add('one-col');
 
+      // Build wheel 1..99 per rounds
       const list = buildWheel(minutesWheel, 99);
       const current = Math.min(99, Math.max(1, gym.rounds));
+      setupWheel(minutesWheel, list, 99, current);
       
-      setupWheel(minutesWheel, list, 99, (v) => {
-        wheelState.minutes.currentValue = v;
-      });
-      
-      setWheelValue(minutesWheel, current, 99);
     } else {
       pickerMode = 'time';
       wheels.classList.remove('one-col');
       secondsCol.hidden = false;
       minutesLabel.textContent = 'Minuti';
       secondsLabel.textContent = 'Secondi';
+      
       pickerTitle.textContent = ({
         'standard-time': 'Imposta tempo',
         'prep': 'Imposta Preparazione',
@@ -353,24 +373,28 @@
         'rest': 'Imposta Rest'
       })[ctx] || 'Imposta';
 
+      // Determina valori iniziali
+      let initMin = 0, initSec = 0;
+      if (ctx === 'standard-time'){
+        initMin = selectedMin;
+        initSec = selectedSec;
+      } else if (ctx === 'prep'){
+        initMin = Math.floor(gym.prepSec / 60);
+        initSec = gym.prepSec % 60;
+      } else if (ctx === 'work'){
+        initMin = Math.floor(gym.workSec / 60);
+        initSec = gym.workSec % 60;
+      } else if (ctx === 'rest'){
+        initMin = Math.floor(gym.restSec / 60);
+        initSec = gym.restSec % 60;
+      }
+
+      // Build e setup wheels
       const minList = buildWheel(minutesWheel, MAX_MIN);
       const secList = buildWheel(secondsWheel, MAX_SEC);
-
-      let initMin = 0, initSec = 0;
-      if (ctx === 'standard-time'){ initMin = selectedMin; initSec = selectedSec; }
-      if (ctx === 'prep'){ initMin = Math.floor(gym.prepSec/60); initSec = gym.prepSec%60; }
-      if (ctx === 'work'){ initMin = Math.floor(gym.workSec/60); initSec = gym.workSec%60; }
-      if (ctx === 'rest'){ initMin = Math.floor(gym.restSec/60); initSec = gym.restSec%60; }
-
-      setupWheel(minutesWheel, minList, MAX_MIN, (v) => {
-        wheelState.minutes.currentValue = v;
-      });
-      setupWheel(secondsWheel, secList, MAX_SEC, (v) => {
-        wheelState.seconds.currentValue = v;
-      });
-
-      setWheelValue(minutesWheel, initMin, MAX_MIN);
-      setWheelValue(secondsWheel, initSec, MAX_SEC);
+      
+      setupWheel(minutesWheel, minList, MAX_MIN, initMin);
+      setupWheel(secondsWheel, secList, MAX_SEC, initSec);
     }
 
     isPickerOpen = true;
@@ -380,71 +404,106 @@
 
   function closePicker(){
     if (!isPickerOpen) return;
+    
+    // Cleanup tracking
+    if (wheelTracking.minutes.rafId){
+      cancelAnimationFrame(wheelTracking.minutes.rafId);
+      wheelTracking.minutes.rafId = null;
+    }
+    if (wheelTracking.seconds.rafId){
+      cancelAnimationFrame(wheelTracking.seconds.rafId);
+      wheelTracking.seconds.rafId = null;
+    }
+    
     isPickerOpen = false;
     overlay.hidden = true;
     wheels.classList.remove('one-col');
     releaseFocusTrap();
-    cleanupListeners(minutesWheel);
-    cleanupListeners(secondsWheel);
   }
 
   cancelPicker.addEventListener('click', closePicker);
 
   confirmPicker.addEventListener('click', () => {
     if (pickerMode === 'integer' && pickerContext === 'rounds'){
-      let v = Math.max(1, Math.min(99, wheelState.minutes.currentValue || gym.rounds));
+      const v = Math.max(1, Math.min(99, wheelTracking.minutes.currentValue));
       gym.rounds = v;
       updateGymUI();
       closePicker();
       return;
     }
 
-    const m = wheelState.minutes.currentValue || 0;
-    const s = wheelState.seconds.currentValue || 0;
+    const m = wheelTracking.minutes.currentValue;
+    const s = wheelTracking.seconds.currentValue;
     const secs = m * 60 + s;
 
     if (pickerContext === 'standard-time'){
       if (secs <= 0){
-        timeLabel.animate([{ transform:'translateY(0)' },{ transform:'translateY(-8px)' },{ transform:'translateY(0)' }], {duration:320, easing:'cubic-bezier(.2,.9,.2,1)'});
+        timeLabel.animate([
+          { transform: 'translateY(0)' },
+          { transform: 'translateY(-8px)' },
+          { transform: 'translateY(0)' }
+        ], { duration: 320, easing: 'cubic-bezier(.2,.9,.2,1)' });
         return;
       }
-      selectedMin = m; selectedSec = s; duration = secs;
+      selectedMin = m;
+      selectedSec = s;
+      duration = secs;
       updateLabel(selectedMin, selectedSec);
-      closePicker();
-      return;
+    } else if (pickerContext === 'prep'){
+      gym.prepSec = secs;
+      updateGymUI();
+    } else if (pickerContext === 'work'){
+      gym.workSec = secs;
+      updateGymUI();
+    } else if (pickerContext === 'rest'){
+      gym.restSec = secs;
+      updateGymUI();
     }
-
-    if (pickerContext === 'prep'){ gym.prepSec = secs; updateGymUI(); closePicker(); return; }
-    if (pickerContext === 'work'){ gym.workSec = secs; updateGymUI(); closePicker(); return; }
-    if (pickerContext === 'rest'){ gym.restSec = secs; updateGymUI(); closePicker(); return; }
+    
+    closePicker();
   });
 
   // ----------------------------- Audio -----------------------------
   async function initAudioContext(){
     if (!audioCtx){
-      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-      catch{ audioCtx = null; }
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch {
+        audioCtx = null;
+      }
     }
     return audioCtx;
   }
+
   async function playStartSound(){
-    const ctx = await initAudioContext(); if (!ctx) return;
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(880, ctx.currentTime);
+    const ctx = await initAudioContext();
+    if (!ctx) return;
+    
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(880, ctx.currentTime);
     g.gain.setValueAtTime(0.0001, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
-    o.connect(g).connect(ctx.destination); o.start();
+    o.connect(g).connect(ctx.destination);
+    o.start();
     o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.38);
     o.stop(ctx.currentTime + 0.42);
   }
+
   async function playFinishSound(){
-    const ctx = await initAudioContext(); if (!ctx) return;
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type='triangle'; o.frequency.setValueAtTime(330, ctx.currentTime);
+    const ctx = await initAudioContext();
+    if (!ctx) return;
+    
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(330, ctx.currentTime);
     g.gain.setValueAtTime(0.0001, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-    o.connect(g).connect(ctx.destination); o.start();
+    o.connect(g).connect(ctx.destination);
+    o.start();
     o.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.28);
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
     o.stop(ctx.currentTime + 0.62);
@@ -455,11 +514,22 @@
     try {
       if ('wakeLock' in navigator && navigator.wakeLock.request){
         wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => { wakeLock = null; });
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
       }
-    } catch { wakeLock = null; }
+    } catch {
+      wakeLock = null;
+    }
   }
-  function releaseWakeLock(){ try{ wakeLock?.release?.(); }catch{} finally{ wakeLock = null; }}
+
+  function releaseWakeLock(){
+    try {
+      wakeLock?.release?.();
+    } catch {} finally {
+      wakeLock = null;
+    }
+  }
 
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible' && rafId !== null && !isPaused && !wakeLock){
@@ -468,17 +538,25 @@
   });
 
   // ----------------------------- Ring color interpolation -----------------------------
-  function hexToRgb(hex){ const n = parseInt(hex.slice(1),16); return {r:(n>>16)&255, g:(n>>8)&255, b:n&255}; }
+  function hexToRgb(hex){
+    const n = parseInt(hex.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
   const COL_START = getComputedStyle(document.documentElement).getPropertyValue('--accent-start').trim() || '#4de0a6';
-  const COL_MID   = getComputedStyle(document.documentElement).getPropertyValue('--accent-mid').trim() || '#ffd166';
-  const COL_END   = getComputedStyle(document.documentElement).getPropertyValue('--accent-end').trim() || '#ff6b6b';
+  const COL_MID = getComputedStyle(document.documentElement).getPropertyValue('--accent-mid').trim() || '#ffd166';
+  const COL_END = getComputedStyle(document.documentElement).getPropertyValue('--accent-end').trim() || '#ff6b6b';
   const S = hexToRgb(COL_START), M = hexToRgb(COL_MID), E = hexToRgb(COL_END);
-  function lerp(a,b,t){ return a + (b-a)*t; }
+
+  function lerp(a, b, t){
+    return a + (b - a) * t;
+  }
+
   function interpolateColor(pct){
     const t = 1 - Math.max(0, Math.min(1, pct));
-    const mid = t<0.5 ? t*2 : (t-0.5)*2;
-    const from = t<0.5 ? S : M;
-    const to = t<0.5 ? M : E;
+    const mid = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+    const from = t < 0.5 ? S : M;
+    const to = t < 0.5 ? M : E;
     const r = Math.round(lerp(from.r, to.r, mid));
     const g = Math.round(lerp(from.g, to.g, mid));
     const b = Math.round(lerp(from.b, to.b, mid));
@@ -492,20 +570,20 @@
     ring.style.stroke = interpolateColor(pct);
   }
 
-  function runCountdown(total, resumeFromPause=false){
+  function runCountdown(total, resumeFromPause = false){
     if (total <= 0) return;
 
     const now = performance.now();
     if (resumeFromPause){
       const elapsedBeforePause = totalDurationOnRun - pausedRemaining;
-      startTs = now - elapsedBeforePause*1000;
+      startTs = now - elapsedBeforePause * 1000;
     } else {
       startTs = now;
       totalDurationOnRun = total;
     }
 
     isPaused = false;
-    startBtn.setAttribute('aria-pressed','true');
+    startBtn.setAttribute('aria-pressed', 'true');
     clockWrap.setAttribute('aria-label', 'Pausa timer');
     clockWrap.classList.remove('paused');
     timeLabel.classList.remove('paused');
@@ -515,18 +593,19 @@
     requestWakeLock();
 
     function frame(ts){
-      const elapsed = (ts - startTs)/1000;
+      const elapsed = (ts - startTs) / 1000;
       const rem = Math.max(0, totalDurationOnRun - elapsed);
       remaining = rem;
 
-      const pct = totalDurationOnRun>0 ? rem/totalDurationOnRun : 0;
-      const mm = Math.floor(rem/60);
-      const ss = Math.floor(rem%60);
+      const pct = totalDurationOnRun > 0 ? rem / totalDurationOnRun : 0;
+      const mm = Math.floor(rem / 60);
+      const ss = Math.floor(rem % 60);
       updateLabel(mm, ss);
       setRingProgress(pct);
 
       if (rem <= 0.05){
-        cancelAnimationFrame(rafId); rafId = null;
+        cancelAnimationFrame(rafId);
+        rafId = null;
         finishTimer();
         return;
       }
@@ -536,9 +615,14 @@
   }
 
   function startTimer(){
-    duration = selectedMin*60 + selectedSec;
+    duration = selectedMin * 60 + selectedSec;
     if (duration <= 0){
-      clockWrap.animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}], {duration:340, easing:'ease-out'});
+      clockWrap.animate([
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-8px)' },
+        { transform: 'translateX(8px)' },
+        { transform: 'translateX(0)' }
+      ], { duration: 340, easing: 'ease-out' });
       return;
     }
     ring.style.strokeWidth = '18';
@@ -551,7 +635,8 @@
     isPaused = true;
     pausedAt = performance.now();
     pausedRemaining = Math.max(0, remaining);
-    cancelAnimationFrame(rafId); rafId = null;
+    cancelAnimationFrame(rafId);
+    rafId = null;
 
     timeLabel.classList.add('paused');
     clockWrap.classList.add('paused');
@@ -561,12 +646,20 @@
 
     releaseWakeLock();
 
-    clockWrap.animate([{transform:'scale(1)'},{transform:'scale(.985)'},{transform:'scale(1)'}], {duration:220, easing:'ease-out'});
+    clockWrap.animate([
+      { transform: 'scale(1)' },
+      { transform: 'scale(.985)' },
+      { transform: 'scale(1)' }
+    ], { duration: 220, easing: 'ease-out' });
   }
 
   function resumeTimer(){
     if (!isPaused) return;
-    if (pausedRemaining <= 0){ isPaused=false; pausedRemaining=0; return; }
+    if (pausedRemaining <= 0){
+      isPaused = false;
+      pausedRemaining = 0;
+      return;
+    }
     startBtn.textContent = 'Avvia';
     runCountdown(pausedRemaining, true);
   }
@@ -582,7 +675,7 @@
 
     startBtn.hidden = false;
     stopBtn.hidden = true;
-    startBtn.setAttribute('aria-pressed','false');
+    startBtn.setAttribute('aria-pressed', 'false');
     startBtn.textContent = 'Avvia';
     clockWrap.setAttribute('aria-label', 'Apri selettore tempo');
     clockWrap.classList.remove('paused');
@@ -593,52 +686,6 @@
     if (gym.active){
       gym.active = false;
       phaseLabel.hidden = true;
-  });
-
-  startBtn.addEventListener('click', () => {
-    if (rafId) return;
-    if (isPaused) resumeTimer(); else startTimer();
-  });
-  stopBtn.addEventListener('click', stopTimer);
-
-  clockWrap.addEventListener('click', () => {
-    if (rafId) { pauseTimer(); }
-    else if (isPaused) { resumeTimer(); }
-    else { openPickerFor('standard-time'); }
-  });
-  clockWrap.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' '){
-      e.preventDefault();
-      if (rafId) pauseTimer();
-      else if (isPaused) resumeTimer();
-      else openPickerFor('standard-time');
-    }
-  });
-
-  function attachOpen(el, ctx){
-    el.addEventListener('click', () => { openPickerFor(ctx); });
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openPickerFor(ctx); }
-    });
-  }
-  attachOpen(prepCircle, 'prep');
-  attachOpen(workCircle, 'work');
-  attachOpen(restCircle, 'rest');
-  attachOpen(roundsCircle, 'rounds');
-  gymStartBtn.addEventListener('click', startGym);
-
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePicker(); });
-  document.addEventListener('keydown', (e) => {
-    if (isPickerOpen && e.key === 'Escape'){ closePicker(); }
-  });
-
-  window.addEventListener('beforeunload', () => {
-    releaseWakeLock();
-    cleanupListeners(minutesWheel);
-    cleanupListeners(secondsWheel);
-    try{ audioCtx?.close?.(); }catch{}
-  });
-})(); = true;
       standardArea.hidden = true;
       gymArea.hidden = false;
       pageTitle.textContent = 'Allenamento';
@@ -651,12 +698,15 @@
   }
 
   function stopTimer(){
-    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    if (rafId){
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     isPaused = false;
     pausedRemaining = 0;
     startBtn.hidden = false;
     stopBtn.hidden = true;
-    startBtn.setAttribute('aria-pressed','false');
+    startBtn.setAttribute('aria-pressed', 'false');
     startBtn.textContent = 'Avvia';
     clockWrap.setAttribute('aria-label', 'Apri selettore tempo');
     clockWrap.classList.remove('paused');
@@ -681,42 +731,51 @@
   function buildPhases(){
     const list = [];
     if (gym.prepSec > 0){
-      list.push({type:'prep', dur:gym.prepSec});
+      list.push({ type: 'prep', dur: gym.prepSec });
     }
-    for (let r=1; r<=gym.rounds; r++){
-      list.push({type:'work', dur:gym.workSec, round:r});
-      if (gym.restSec > 0){ list.push({type:'rest', dur:gym.restSec, round:r}); }
+    for (let r = 1; r <= gym.rounds; r++){
+      list.push({ type: 'work', dur: gym.workSec, round: r });
+      if (gym.restSec > 0){
+        list.push({ type: 'rest', dur: gym.restSec, round: r });
+      }
     }
     return list;
   }
+
   function phaseLabelText(phase){
     const base = phase.type === 'prep' ? 'Preparazione' : (phase.type === 'work' ? 'Work' : 'Rest');
     const roundTxt = phase.type === 'prep' ? '' : ` • Round ${phase.round}/${gym.rounds}`;
     return base + roundTxt;
   }
+
   function nextGymPhase(){
     gym.index++;
     const ph = gym.phases[gym.index];
-    if (!ph){ finishTimer(); return; }
+    if (!ph){
+      finishTimer();
+      return;
+    }
 
     phaseLabel.hidden = false;
     setPhaseInfo(phaseLabelText(ph));
     ring.style.strokeWidth = '18';
 
-    updateLabel(Math.floor(ph.dur/60), ph.dur%60);
+    updateLabel(Math.floor(ph.dur / 60), ph.dur % 60);
     runCountdown(ph.dur, false);
   }
 
   function animateGridCollapse(callback){
+    // Ensure we can measure target center
     standardArea.hidden = false;
     const prevVis = standardArea.style.visibility;
     standardArea.style.visibility = 'hidden';
     standardArea.style.pointerEvents = 'none';
 
     const targetRect = clockWrap.getBoundingClientRect();
-    const tx = targetRect.left + targetRect.width/2;
-    const ty = targetRect.top + targetRect.height/2;
+    const tx = targetRect.left + targetRect.width / 2;
+    const ty = targetRect.top + targetRect.height / 2;
 
+    // Restore visibility
     standardArea.style.visibility = prevVis || '';
     standardArea.hidden = true;
     standardArea.style.pointerEvents = '';
@@ -724,10 +783,11 @@
     const circles = [prepCircle, workCircle, restCircle, roundsCircle];
     circles.forEach((el) => {
       const r = el.getBoundingClientRect();
-      const cx = r.left + r.width/2;
-      const cy = r.top + r.height/2;
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
       el.style.setProperty('--dx', `${tx - cx}px`);
       el.style.setProperty('--dy', `${ty - cy}px`);
+      el.style.setProperty('--rot', `${Math.random() * 20 - 10}deg`);
       el.classList.add('collapse-anim');
     });
 
@@ -739,10 +799,18 @@
 
   function startGym(){
     if (gym.workSec <= 0){
-      gymArea.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], {duration:260, easing:'ease-out'});
+      gymArea.animate([
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-6px)' },
+        { transform: 'translateX(6px)' },
+        { transform: 'translateX(0)' }
+      ], { duration: 260, easing: 'ease-out' });
       return;
     }
-    if (gym.rounds <= 0){ gym.rounds = 1; updateGymUI(); }
+    if (gym.rounds <= 0){
+      gym.rounds = 1;
+      updateGymUI();
+    }
 
     gym.phases = buildPhases();
     gym.index = -1;
@@ -762,17 +830,91 @@
 
   // ----------------------------- Events -----------------------------
   modeTimerBtn.addEventListener('click', () => {
-    modeTimerBtn.classList.add('selected'); modeTimerBtn.setAttribute('aria-selected','true');
-    modeGymBtn.classList.remove('selected'); modeGymBtn.setAttribute('aria-selected','false');
+    modeTimerBtn.classList.add('selected');
+    modeTimerBtn.setAttribute('aria-selected', 'true');
+    modeGymBtn.classList.remove('selected');
+    modeGymBtn.setAttribute('aria-selected', 'false');
     pageTitle.textContent = 'Timer';
     gymArea.hidden = true;
     standardArea.hidden = false;
     phaseLabel.hidden = true;
   });
+
   modeGymBtn.addEventListener('click', () => {
-    modeGymBtn.classList.add('selected'); modeGymBtn.setAttribute('aria-selected','true');
-    modeTimerBtn.classList.remove('selected'); modeTimerBtn.setAttribute('aria-selected','false');
+    modeGymBtn.classList.add('selected');
+    modeGymBtn.setAttribute('aria-selected', 'true');
+    modeTimerBtn.classList.remove('selected');
+    modeTimerBtn.setAttribute('aria-selected', 'false');
     pageTitle.textContent = 'Allenamento';
     standardArea.hidden = true;
     gymArea.hidden = false;
-    phaseLabel.hidden
+    phaseLabel.hidden = true;
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (rafId) return;
+    if (isPaused) resumeTimer();
+    else startTimer();
+  });
+
+  stopBtn.addEventListener('click', stopTimer);
+
+  clockWrap.addEventListener('click', () => {
+    if (rafId){
+      pauseTimer();
+    } else if (isPaused){
+      resumeTimer();
+    } else {
+      openPickerFor('standard-time');
+    }
+  });
+
+  clockWrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      if (rafId) pauseTimer();
+      else if (isPaused) resumeTimer();
+      else openPickerFor('standard-time');
+    }
+  });
+
+  function attachOpen(el, ctx){
+    el.addEventListener('click', () => openPickerFor(ctx));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        openPickerFor(ctx);
+      }
+    });
+  }
+
+  attachOpen(prepCircle, 'prep');
+  attachOpen(workCircle, 'work');
+  attachOpen(restCircle, 'rest');
+  attachOpen(roundsCircle, 'rounds');
+
+  gymStartBtn.addEventListener('click', startGym);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePicker();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (isPickerOpen && e.key === 'Escape'){
+      closePicker();
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    releaseWakeLock();
+    if (wheelTracking.minutes.rafId){
+      cancelAnimationFrame(wheelTracking.minutes.rafId);
+    }
+    if (wheelTracking.seconds.rafId){
+      cancelAnimationFrame(wheelTracking.seconds.rafId);
+    }
+    try {
+      audioCtx?.close?.();
+    } catch {}
+  });
+})();
