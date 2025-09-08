@@ -32,12 +32,15 @@ function refreshDials(){
 refreshDials();
 
 /* ======= Wheels (snap pickers) ======= */
-
 class SnapWheel {
   constructor(root, {min, max, selected, pad=false}){
     this.root = root;
     this.min = min; this.max = max; this.pad = pad;
     this.itemHeight = 64;
+    // offset centrale per posizionamento perfetto
+    this.updateOffset = () => { this.offset = (this.root.clientHeight/2 - this.itemHeight/2); };
+    this.updateOffset();
+
     // Build items
     const frag = document.createDocumentFragment();
     for(let i=min;i<=max;i++){
@@ -58,33 +61,33 @@ class SnapWheel {
     root.addEventListener('scroll', this.onScroll, {passive:true});
     root.addEventListener('touchend', this.onTouchEnd);
     root.addEventListener('pointerup', this.onTouchEnd);
+    window.addEventListener('resize', () => { this.updateOffset(); this.setSelected(this.value(), false); });
     this.afterScrollTimer = null;
     this.updateActive();
   }
-  value(){ return this.min + Math.round(this.root.scrollTop / this.itemHeight); }
+  index(){ return Math.round((this.root.scrollTop + this.offset) / this.itemHeight); }
+  value(){ return this.min + this.index(); }
   setSelected(v, smooth=true){
     const idx = clamp(v - this.min, 0, this.max - this.min);
-    this.root.scrollTo({top: idx*this.itemHeight, behavior: smooth? 'smooth' : 'auto'});
+    this.root.scrollTo({top: idx*this.itemHeight - this.offset, behavior: smooth? 'smooth' : 'auto'});
     this.updateActive(idx);
   }
   updateActive(forceIndex=null){
-    const idx = forceIndex ?? Math.round(this.root.scrollTop / this.itemHeight);
+    const idx = forceIndex ?? this.index();
     [...this.root.children].forEach((el,i)=> el.classList.toggle('active', i===idx));
   }
   onScroll(){
     if(this.afterScrollTimer) clearTimeout(this.afterScrollTimer);
     this.updateActive();
     this.afterScrollTimer = setTimeout(()=>{
-      // snap to nearest
-      const idx = Math.round(this.root.scrollTop / this.itemHeight);
-      this.root.scrollTo({top: idx*this.itemHeight, behavior:'smooth'});
+      const idx = this.index();
+      this.root.scrollTo({top: idx*this.itemHeight - this.offset, behavior:'smooth'});
       this.updateActive(idx);
     }, 80);
   }
   onTouchEnd(){
-    // kick one last snap
-    const idx = Math.round(this.root.scrollTop / this.itemHeight);
-    this.root.scrollTo({top: idx*this.itemHeight, behavior:'smooth'});
+    const idx = this.index();
+    this.root.scrollTo({top: idx*this.itemHeight - this.offset, behavior:'smooth'});
     this.updateActive(idx);
   }
 }
@@ -104,7 +107,7 @@ let minuteWheel, secondsWheel, roundsWheel;
 function openPicker(key){
   activeKey = key;
   modal.classList.remove('hidden');
-  requestAnimationFrame(()=> sheet.style.transform = 'translateY(0)'); // ensure hardware accel
+  requestAnimationFrame(()=> sheet.style.transform = 'translateY(0)');
   pickerTitle.textContent = key==='rounds' ? 'Imposta giri' :
     `Imposta ${key==='prep' ? 'Preparazione' : (key==='work'?'Work':'Rest')}`;
 
@@ -123,7 +126,6 @@ function openPicker(key){
       minuteWheel = new SnapWheel(wheelsContainer.querySelector('[data-type="minutes"]'), {min:0, max:59, selected: 0, pad:true});
       secondsWheel = new SnapWheel(wheelsContainer.querySelector('[data-type="seconds"]'), {min:0, max:59, selected: 0, pad:true});
     }
-    // Set initial from state
     const total = state[key];
     minuteWheel.setSelected(Math.floor(total/60), false);
     secondsWheel.setSelected(total%60, false);
@@ -152,7 +154,6 @@ const startBtn = document.getElementById('start-btn');
 const runScreen = document.getElementById('run-screen');
 
 startBtn.addEventListener('click', ()=>{
-  // compute dx/dy for each dial to center of grid
   const grid = editScreen.querySelector('.grid');
   const gridRect = grid.getBoundingClientRect();
   const centerX = gridRect.left + gridRect.width/2;
@@ -167,7 +168,6 @@ startBtn.addEventListener('click', ()=>{
     dial.style.setProperty('--dy', dy+'px');
   });
 
-  // After animation, swap screens and boot timer
   setTimeout(()=>{
     editScreen.classList.remove('active');
     editScreen.classList.remove('collapsing');
@@ -199,13 +199,11 @@ let paused = false;
 function setProgress(frac, phase){
   const offset = circumference*(1-frac);
   svgProgress.style.strokeDashoffset = `${offset}`;
-  // Color that dims as time elapses
   const base = phaseColors[phase];
   svgProgress.style.stroke = base;
 }
 
 function hslFromHex(hex){
-  // convert hex to hsl for slight animation if desired
   const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if(!res) return [0,0,100];
   let r = parseInt(res[1],16)/255;
@@ -219,7 +217,7 @@ function hslFromHex(hex){
     switch(max){
       case r: h=(g-b)/d+(g<b?6:0); break;
       case g: h=(b-r)/d+2; break;
-      case b: h=(r-g)/d+4; break;
+      case b: h=(r-g)/d+4); break;
     }
     h/=6;
   }
@@ -258,7 +256,7 @@ function bootTimer(){
     roundLabel.textContent = round ? `round ${round}/${state.rounds}` : '';
     svgProgress.style.transition = 'none';
     setProgress(1, phase);
-    void svgProgress.offsetWidth; // reflow to reset transition
+    void svgProgress.offsetWidth;
     svgProgress.style.transition = 'stroke-dashoffset .2s linear, stroke .2s linear';
     timeLabel.textContent = secToLabel(remaining);
 
@@ -268,19 +266,16 @@ function bootTimer(){
       remaining = clamp(remaining-1, 0, total);
       const frac = total===0? 1 : remaining/total;
       setProgress(frac, phase);
-      // Slight color dimming
       const lum = Math.max(40, Math.min(70, l - (1-frac)*15));
       svgProgress.style.stroke = `hsl(${h} ${s}% ${lum}%)`;
       timeLabel.textContent = secToLabel(remaining);
       if(remaining<=0){
         clearInterval(timer);
         step++;
-        // brief delay between phases for visual clarity
         setTimeout(runStep, 260);
       }
     }, 1000);
 
-    // immediate initial update (so ring starts at almost full)
     const fracStart = total===0?1: remaining/total;
     setProgress(fracStart, phase);
   }
