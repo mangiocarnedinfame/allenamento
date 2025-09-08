@@ -71,42 +71,45 @@ body{
 .round{font-weight:800; font-size:clamp(22px,5.2vw,28px); margin-top:6px}
 .touch-hint{color:#a2aebb; font-size:14px; margin-top:8px}
 
-/* ====== Modal FULL SCREEN (identico allo screen) ====== */
+/* ====== Modal FULL SCREEN ====== */
 .modal.hidden{display:none}
 .modal{position:fixed; inset:0; z-index:50}
 .modal .backdrop{
   position:absolute; inset:0;
-  /* leggero dim + blur come nello screenshot */
   background: rgba(0,0,0,.45);
   backdrop-filter: blur(8px) saturate(120%);
 }
 
-/* il pannello adesso occupa TUTTO lo schermo */
+/* Il pannello occupa TUTTO lo schermo */
 .sheet{
   position:absolute; inset:0; display:flex; flex-direction:column;
-  padding: calc(18px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
-  /* tinta scura piena come nella foto */
+  /* padding con safe-area */
+  padding: calc(18px + env(safe-area-inset-top)) 16px 0;
   background: linear-gradient(180deg, rgba(15,22,31,.96) 0%, rgba(11,17,24,.96) 100%);
 }
 
-/* Header grande a sinistra: "Imposta Work" */
-.sheet-header{padding: 6px 6px 14px}
-.sheet-title{
-  font-weight:800; font-size:34px; letter-spacing:.3px; color:#eef3f8;
-}
+/* Header in alto */
+.sheet-header{padding: 6px 6px 10px}
+.sheet-title{font-weight:800; font-size:34px; letter-spacing:.3px; color:#eef3f8}
 
-/* Wheels al centro */
-.wheels{display:flex; gap:18px; justify-content:space-evenly; padding: 6px 2px}
+/* Wheels FULL HEIGHT (lascia spazio solo ai bottoni) */
+.wheels{
+  flex:1;                       /* <-- prende tutto lo spazio disponibile */
+  min-height:0;                 /* important per consentire overflow alla wheel */
+  display:flex; gap:18px; justify-content:space-evenly;
+  padding: 6px 2px 0;
+}
 #wheels-container{display:flex}
 #wheel-rounds{display:none}
-.wheel-col{flex:1; max-width:280px}
+.wheel-col{flex:1; max-width:280px; display:flex; flex-direction:column; min-height:0}
 .wheel-col.single{margin:0 auto}
 .wheel-label{color:#cfd7df; margin: 8px 0 10px 14px; font-weight:800}
 
-/* Picker stile iOS con rettangolo glass centrale */
+/* Wheel con contenuto che SCORRE a tutta altezza */
 .wheel{
   --item-h:64px; --sel-h:calc(var(--item-h) + 22px);
-  height: 230px; position:relative; overflow-y:auto; overscroll-behavior:contain;
+  flex:1; min-height:0; height:auto;
+  position:relative; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
   scroll-snap-type:y mandatory; scroll-behavior:smooth; border-radius:16px;
   border:1px solid rgba(255,255,255,.05);
   background: radial-gradient(120px 120px at 50% 0%, #0f1721 0%, #0b1118 60%) no-repeat,
@@ -114,35 +117,40 @@ body{
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
 }
 .wheel::-webkit-scrollbar{display:none}
+
+/* RETTANGOLO CENTRALE FISSO (bloccato) */
 .wheel::before{
-  content:""; position:absolute; left:10px; right:10px; top:calc(50% - var(--sel-h)/2);
-  height:var(--sel-h); border-radius:14px; border:1.5px solid rgba(255,255,255,.14);
+  content:""; position:absolute; left:10px; right:10px; top:50%;
+  transform: translateY(-50%);                      /* <-- sempre al centro */
+  height:var(--sel-h); border-radius:14px;
+  border:1.5px solid rgba(255,255,255,.14);
   background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 55%);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), 0 8px 24px rgba(0,0,0,.45);
-  pointer-events:none
+  pointer-events:none; z-index:3;                   /* sta sopra ai numeri */
 }
+/* Vignetta top/bottom (sotto al rettangolo) */
 .wheel::after{
   content:""; position:absolute; inset:0; border-radius:16px; pointer-events:none;
-  background: linear-gradient(to bottom, rgba(10,15,20,.85), transparent 18%, transparent 82%, rgba(10,15,20,.85))
+  background: linear-gradient(to bottom, rgba(10,15,20,.85), transparent 18%, transparent 82%, rgba(10,15,20,.85));
+  z-index:2;
 }
+
+/* Numeri */
 .wheel-item{
-  height:var(--item-h); display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
-  font-size:54px; font-weight:900; color:#8ea0b5; opacity:.55
+  height:var(--item-h); display:flex; align-items:center; justify-content:center;
+  scroll-snap-align:center; font-size:54px; font-weight:900; color:#8ea0b5; opacity:.55; z-index:1;
 }
 .wheel-item.active{color:#fff; opacity:1; text-shadow:0 10px 26px rgba(0,0,0,.7)}
 
-/* Barra azioni uguale allo screen: testo Annulla a sx, tasto bianco a dx */
+/* Barra azioni fissa in basso */
 .sheet-actions{
-  margin-top:auto; display:flex; align-items:center; justify-content:space-between;
-  gap:14px; padding-top:12px
+  margin-top:auto; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.25) 70%);
 }
 .btn{border:none; font-weight:800}
-.btn.link{
-  background:transparent; color:#e3eaf3; padding:14px 8px; font-size:18px
-}
-.btn.confirm{
-  background:#fff; color:#0a0f14; padding:16px 22px; border-radius:14px; font-size:20px; min-width:42%
-}
+.btn.link{background:transparent; color:#e3eaf3; padding:14px 8px; font-size:18px}
+.btn.confirm{background:#fff; color:#0a0f14; padding:16px 22px; border-radius:14px; font-size:20px; min-width:42%}
 
 /* Desktop nicety */
 @media (min-width:900px){
