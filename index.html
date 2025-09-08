@@ -5,13 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>HIIT Timer</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
 </head>
 <body>
   <div id="app">
-    <!-- =================== EDIT SCREEN =================== -->
+    <!-- Schermata di configurazione -->
     <section id="edit-screen" class="screen active">
       <div class="grid">
         <button class="dial" data-key="prep">
@@ -48,7 +46,7 @@
       <p class="hint">Tocca un cerchio per modificare; poi Avvia.</p>
     </section>
 
-    <!-- =================== RUN SCREEN =================== -->
+    <!-- Schermata del timer -->
     <section id="run-screen" class="screen">
       <div class="phase" id="phase-label">Work</div>
       <div class="ring-timer" id="main-timer">
@@ -68,15 +66,17 @@
     </section>
   </div>
 
-  <!-- =================== MODAL PICKER =================== -->
+  <!-- PICKER a schermo intero -->
   <div id="picker-modal" class="modal hidden" aria-hidden="true">
     <div class="backdrop"></div>
+
     <div class="sheet">
+      <!-- Header -->
       <div class="sheet-header">
         <div class="sheet-title" id="picker-title">Imposta</div>
       </div>
 
-      <!-- minuti/secondi -->
+      <!-- Wheels minuti/secondi -->
       <div class="wheels" id="wheels-container">
         <div class="wheel-col">
           <div class="wheel-label">Minuti</div>
@@ -88,7 +88,7 @@
         </div>
       </div>
 
-      <!-- giri -->
+      <!-- Wheel giri -->
       <div class="wheels" id="wheel-rounds">
         <div class="wheel-col single">
           <div class="wheel-label">&nbsp;</div>
@@ -96,8 +96,9 @@
         </div>
       </div>
 
+      <!-- Barra azioni -->
       <div class="sheet-actions">
-        <button class="btn ghost" id="btn-cancel">Annulla</button>
+        <button class="btn link" id="btn-cancel">Annulla</button>
         <button class="btn confirm" id="btn-confirm">Conferma</button>
       </div>
     </div>
