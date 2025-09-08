@@ -86,11 +86,17 @@ const pickerTitle=document.getElementById('picker-title');
 
 let activeKey=null; let minuteWheel,secondsWheel,roundsWheel;
 
+function titleFor(key){
+  if(key==='prep') return 'Imposta Preparazione';
+  if(key==='work') return 'Imposta Work';
+  if(key==='rest') return 'Imposta Rest';
+  return 'Imposta giri';
+}
+
 function openPicker(key){
   activeKey=key;
   modal.classList.remove('hidden');
-  pickerTitle.textContent = key==='rounds' ? 'Imposta giri' :
-    `Imposta ${key==='prep'?'Work'.replace('Work','Preparazione'): (key==='work'?'Work':'Rest')}`;
+  pickerTitle.textContent = titleFor(key);
 
   if(key==='rounds'){
     wheelsContainer.style.display='none';
