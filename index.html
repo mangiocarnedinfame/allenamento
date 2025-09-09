@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Interval Timer</title>
+  <style>
+    :root{
+      --bg:#0f1116;
+      --bg-2:#151821;
+      --text:#e7e7ea;
+      --muted:#8b8f98;
+      --blue:#2f6cf6;
+      --blue-2:#1946d7;
+      --value:#0a6cff;
+      --green:#4ade80;
+      --orange:#fb923c;
+      --ring:#22252f;
+      --picker-slot:#20232e;
+      --shadow:0 10px 30px rgba(0,0,0,.45);
+    }
+
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      background: radial-gradient(1200px 800px at 50% -300px, #11131b 0%, var(--bg) 40%, #0b0d13 100%);
+      color:var(--text); overflow:hidden; display:flex; flex-direction:column;
+      letter-spacing:.2px;
+    }
+
+    /* MAIN */
+    .main-screen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px}
+    .circles-container{
+      width:100%; max-width:520px;
+      display:grid; grid-template-columns:repeat(2, 1fr); gap:34px; margin-bottom:56px;
+    }
+    .circle{
+      position:relative; aspect-ratio:1/1; border-radius:50%;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      cursor:pointer; background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+      box-shadow: inset 0 0 0 2px rgba(47,108,246,.25), 0 0 0 3px rgba(47,108,246,.06), var(--shadow);
+      isolation:isolate; transition:transform .08s ease, box-shadow .2s ease;
+    }
+    .circle::after{
+      content:""; position:absolute; inset:-2px;
+      border-radius:inherit;
+      box-shadow: 0 0 18px rgba(47,108,246,.35), inset 0 0 22px rgba(47,108,246,.12);
+      opacity:.6; pointer-events:none;
+    }
+    .circle:active{transform:scale(.97)}
+    .circle-label{font-size:18px; color:var(--muted); margin-bottom:8px; font-weight:600}
+    .circle-value{font-size:38px; font-weight:700; color:var(--value); text-shadow:0 0 12px rgba(10,108,255,.15)}
+
+    .start-button{
+      margin-top:6px; padding:18px 86px; border:0; border-radius:14px;
+      background:linear-gradient(180deg,var(--blue) 0%, var(--blue-2) 100%);
+      color:#fff; font-size:24px; font-weight:700; letter-spacing:.3px; cursor:pointer;
+      box-shadow:0 14px 28px rgba(47,108,246,.28), inset 0 1px 0 rgba(255,255,255,.2);
+      transition:transform .06s ease, filter .15s ease;
+    }
+    .start-button:active{transform:translateY(1px); filter:brightness(.96)}
+
+    .instruction-text{margin-top:18px; color:#777c86; font-size:18px}
+
+    /* PICKERS */
+    .picker-screen{
+      position:fixed; inset:0; background:linear-gradient(180deg,var(--bg) 0%, #0e1016 100%);
+      display:none; flex-direction:column; padding:42px 20px; z-index:100;
+    }
+    .picker-screen.active{display:flex}
+    .picker-title{font-size:34px; font-weight:800; margin:0 0 30px 4px; color:#eaf3ef}
+    .picker-labels{display:flex; justify-content:space-around; color:#7f8692; font-size:18px; margin-bottom:10px}
+
+    .picker-container{flex:1; display:flex; justify-content:space-around; align-items:center; position:relative; overflow:hidden}
+    .picker-wheel{position:relative; width:44%; height:300px; overflow:hidden}
+    .picker-wheel.single{width:62%}
+    .picker-items{position:absolute; width:100%; transition:transform .15s ease-out}
+    .picker-item{
+      height:100px; display:flex; align-items:center; justify-content:center;
+      font-size:54px; font-weight:800; color:#3d4250; text-shadow:0 1px 0 rgba(255,255,255,.04);
+    }
+    .picker-item.selected{color:#fff}
+    .picker-highlight{
+      position:absolute; left:10px; right:10px; top:50%; height:98px; transform:translateY(-50%);
+      border-radius:14px; background:var(--picker-slot);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.4);
+      pointer-events:none;
+    }
+
+    .picker-buttons{display:flex; gap:10px; margin-top:36px}
+    .picker-button{flex:1; padding:18px; background:transparent; color:#fff; border:0; font-size:20px}
+    .picker-button.confirm{
+      background:#fff; color:#000; font-weight:700; border-radius:12px; box-shadow:var(--shadow)
+    }
+
+    /* TIMER */
+    .timer-screen{position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:110}
+    .timer-screen.active{display:flex}
+    .phase-title{font-size:82px; line-height:.9; font-weight:900; letter-spacing:.5px; margin:0 0 24px}
+    .timer-circle{width:300px; height:300px; position:relative}
+    .timer-svg{width:100%; height:100%; transform:rotate(-90deg)}
+    .timer-background{fill:none; stroke:var(--ring); stroke-width:22}
+    .timer-progress{fill:none; stroke-width:22; stroke-linecap:round; transition:stroke-dashoffset .1s linear}
+    .timer-progress.work{stroke:var(--green)}
+    .timer-progress.rest{stroke:var(--orange)}
+    .timer-text{
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      font-size:64px; font-weight:800; color:#fff; text-shadow:0 6px 30px rgba(0,0,0,.6)
+    }
+    .round-text{margin-top:36px; font-size:40px; font-weight:800}
+    .timer-instruction{margin-top:48px; color:#7b808b; font-size:17px}
+  </style>
+</head>
+<body>
+  <!-- MAIN -->
+  <div class="main-screen" id="mainScreen">
+    <div class="circles-container">
+      <button class="circle" data-type="prep" aria-label="Imposta preparazione">
+        <div class="circle-label">Preparazione</div>
+        <div class="circle-value" id="prepValue">00:00</div>
+      </button>
+      <button class="circle" data-type="work" aria-label="Imposta work">
+        <div class="circle-label">Work</div>
+        <div class="circle-value" id="workValue">00:30</div>
+      </button>
+      <button class="circle" data-type="rest" aria-label="Imposta rest">
+        <div class="circle-label">Rest</div>
+        <div class="circle-value" id="restValue">00:20</div>
+      </button>
+      <button class="circle" data-type="rounds" aria-label="Imposta giri">
+        <div class="circle-label">Giri</div>
+        <div class="circle-value" id="roundsValue">03</div>
+      </button>
+    </div>
+
+    <button class="start-button" id="startBtn">Avvia</button>
+    <div class="instruction-text">Tocca un cerchio per modificare; poi Avvia.</div>
+  </div>
+
+  <!-- TIME PICKER -->
+  <div class="picker-screen" id="timePicker" aria-hidden="true">
+    <h2 class="picker-title" id="pickerTitle">Imposta</h2>
+    <div class="picker-labels" id="pickerLabels">
+      <span>Minuti</span><span>Secondi</span>
+    </div>
+    <div class="picker-container">
+      <div class="picker-wheel" id="minutesWheel">
+        <div class="picker-highlight"></div>
+        <div class="picker-items" id="minutesItems"></div>
+      </div>
+      <div class="picker-wheel" id="secondsWheel">
+        <div class="picker-highlight"></div>
+        <div class="picker-items" id="secondsItems"></div>
+      </div>
+    </div>
+    <div class="picker-buttons">
+      <button class="picker-button" id="cancelBtn">Annulla</button>
+      <button class="picker-button confirm" id="confirmBtn">Conferma</button>
+    </div>
+  </div>
+
+  <!-- ROUNDS PICKER -->
+  <div class="picker-screen" id="roundsPicker" aria-hidden="true">
+    <h2 class="picker-title">Imposta giri</h2>
+    <div class="picker-labels"><span>Giri</span></div>
+    <div class="picker-container">
+      <div class="picker-wheel single">
+        <div class="picker-highlight"></div>
+        <div class="picker-items" id="roundsItems"></div>
+      </div>
+    </div>
+    <div class="picker-buttons">
+      <button class="picker-button" id="roundsCancelBtn">Annulla</button>
+      <button class="picker-button confirm" id="roundsConfirmBtn">Conferma</button>
+    </div>
+  </div>
+
+  <!-- TIMER -->
+  <div class="timer-screen" id="timerScreen" aria-live="polite">
+    <h1 class="phase-title" id="phaseTitle">Work</h1>
+    <div class="timer-circle" id="timerCircle">
+      <svg class="timer-svg" viewBox="0 0 300 300">
+        <circle cx="150" cy="150" r="129" class="timer-background"></circle>
+        <circle cx="150" cy="150" r="129" class="timer-progress" id="timerProgress"></circle>
+      </svg>
+      <div class="timer-text" id="timerText">00:00</div>
+    </div>
+    <div class="round-text" id="roundText">round 1/3</div>
+    <div class="timer-instruction">Tocca il cerchio per pause/resume</div>
+  </div>
+
+  <audio id="beep" preload="auto">
+    <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYBAGFhYWFhYWFh" type="audio/wav">
+  </audio>
+
+  <script>
+    /* ============ STATE ============ */
+    const settings = JSON.parse(localStorage.getItem('intervalSettings') || '{}');
+    if(!('prep' in settings)){ Object.assign(settings,{prep:0, work:30, rest:20, rounds:3}); }
+
+    let currentPicker = null;
+    let selectedMinutes = 0, selectedSeconds = 0, selectedRounds = 1;
+    let timerInterval = null, isPaused = false;
+    let currentTime = 0, totalTime = 0, phaseIndex = 0;
+    let phases = [];
+
+    /* ============ HELPERS ============ */
+    const $ = sel => document.querySelector(sel);
+
+    const formatTime = s => {
+      const m = Math.floor(s/60), sec = s%60;
+      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    };
+
+    const updateMainScreen = () => {
+      $('#prepValue').textContent   = formatTime(settings.prep);
+      $('#workValue').textContent   = formatTime(settings.work);
+      $('#restValue').textContent   = formatTime(settings.rest);
+      $('#roundsValue').textContent = String(settings.rounds).padStart(2,'0');
+      localStorage.setItem('intervalSettings', JSON.stringify(settings));
+    };
+
+    const createPickerItems = (container, max) => {
+      container.innerHTML = '';
+      for(let i=0;i<=max;i++){
+        const d = document.createElement('div');
+        d.className = 'picker-item';
+        d.textContent = String(i).padStart(2,'0');
+        d.dataset.value = i;
+        container.appendChild(d);
+      }
+    };
+
+    function setupWheel(container, initial){
+      const itemH = 100;
+      let index = initial;
+      let startY = 0, startOffset = 0;
+
+      const maxIndex = container.children.length - 1;
+      const setPos = () => {
+        const offset = -index * itemH + itemH;
+        container.style.transform = `translateY(${offset}px)`;
+        [...container.children].forEach((el,i)=>el.classList.toggle('selected', i===index));
+      };
+      setPos();
+
+      const getIndexFromOffset = off => Math.max(0, Math.min(maxIndex, Math.round(off / itemH)));
+
+      const onStart = y => { startY = y; startOffset = index * itemH; };
+      const onMove  = y => {
+        const newOff = startOffset + (startY - y);
+        index = getIndexFromOffset(newOff);
+        setPos();
+      };
+
+      container.ontouchstart = e => onStart(e.touches[0].clientY);
+      container.ontouchmove  = e => { e.preventDefault(); onMove(e.touches[0].clientY); };
+      container.onmousedown  = e => { onStart(e.clientY); const mm = ev => onMove(ev.clientY); const up = ()=>{window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',up)}; window.addEventListener('mousemove',mm); window.addEventListener('mouseup',up); };
+
+      return {
+        get value(){ return index; },
+        set value(v){ index = v; setPos(); }
+      };
+    }
+
+    /* ============ PICKERS ============ */
+    let minutesWheel, secondsWheel, roundsWheel;
+
+    function openPicker(type){
+      currentPicker = type;
+      if(type === 'rounds'){
+        $('#roundsPicker').classList.add('active');
+        const box = $('#roundsItems');
+        createPickerItems(box, 99);
+        roundsWheel = setupWheel(box, settings.rounds-1);
+        selectedRounds = settings.rounds;
+      } else {
+        $('#timePicker').classList.add('active');
+        const title = type === 'prep' ? 'Preparazione' : type.charAt(0).toUpperCase()+type.slice(1);
+        $('#pickerTitle').textContent = `Imposta ${title}`;
+        createPickerItems($('#minutesItems'), 59);
+        createPickerItems($('#secondsItems'), 59);
+        minutesWheel = setupWheel($('#minutesItems'), Math.floor(settings[type]/60));
+        secondsWheel = setupWheel($('#secondsItems'), settings[type]%60);
+        selectedMinutes = minutesWheel.value;
+        selectedSeconds = secondsWheel.value;
+      }
+    }
+
+    /* ============ TIMER ============ */
+    const progressEl = $('#timerProgress');
+    const timerText  = $('#timerText');
+    const roundText  = $('#roundText');
+    const phaseTitle = $('#phaseTitle');
+    const beep = $('#beep');
+
+    const R = 129;
+    const CIRC = 2 * Math.PI * R;
+    progressEl.style.strokeDasharray = `${CIRC}`;
+
+    function buildPhases(){
+      phases = [];
+      if(settings.prep>0) phases.push({name:'Preparazione', type:'prep', duration:settings.prep});
+      for(let i=1;i<=settings.rounds;i++){
+        phases.push({name:'Work', type:'work', duration:settings.work, round:i});
+        if(i<settings.rounds || settings.rest>0) phases.push({name:'Rest', type:'rest', duration:settings.rest, round:i});
+      }
+      phaseIndex = 0;
+    }
+
+    function showPhase(p){
+      $('#timerScreen').classList.add('active');
+
+      phaseTitle.textContent = p.name;
+      roundText.textContent = p.round ? `round ${p.round}/${settings.rounds}` : '';
+      progressEl.className = `timer-progress ${p.type}`;
+
+      totalTime = p.duration;
+      currentTime = p.duration;
+      timerText.textContent = formatTime(currentTime);
+
+      // start with empty ring, fill as time elapses
+      progressEl.style.strokeDashoffset = CIRC;
+      clearInterval(timerInterval);
+      timerInterval = setInterval(tick, 1000);
+    }
+
+    function tick(){
+      if(isPaused) return;
+
+      currentTime--;
+      timerText.textContent = formatTime(Math.max(0,currentTime));
+
+      const elapsed = Math.max(0, totalTime - currentTime);
+      const ratio = totalTime ? (elapsed / totalTime) : 1;
+      progressEl.style.strokeDashoffset = CIRC * (1 - ratio);
+
+      if(currentTime <= 0){
+        try{ navigator.vibrate?.(30); }catch(e){}
+        beep.currentTime = 0; beep.play().catch(()=>{});
+        clearInterval(timerInterval);
+        setTimeout(nextPhase, 900); // piccola pausa visiva
+      }
+    }
+
+    function nextPhase(){
+      phaseIndex++;
+      if(phaseIndex >= phases.length){
+        $('#timerScreen').classList.remove('active');
+        return;
+      }
+      showPhase(phases[phaseIndex]);
+    }
+
+    function startTimer(){
+      isPaused = false;
+      buildPhases();
+      if(!phases.length) return;
+      showPhase(phases[0]);
+    }
+
+    /* ============ EVENTS ============ */
+    document.querySelectorAll('.circle').forEach(c=>{
+      c.addEventListener('click', ()=>openPicker(c.dataset.type));
+    });
+
+    // time picker
+    $('#cancelBtn').onclick = ()=> $('#timePicker').classList.remove('active');
+    $('#confirmBtn').onclick = ()=>{
+      const value = minutesWheel.value * 60 + secondsWheel.value;
+      settings[currentPicker] = value;
+      updateMainScreen();
+      $('#timePicker').classList.remove('active');
+    };
+
+    // rounds picker
+    $('#roundsCancelBtn').onclick = ()=> $('#roundsPicker').classList.remove('active');
+    $('#roundsConfirmBtn').onclick = ()=>{
+      const idx = $('#roundsItems').querySelector('.selected')?.dataset.value ?? (settings.rounds-1);
+      settings.rounds = Number(idx)+1;
+      updateMainScreen();
+      $('#roundsPicker').classList.remove('active');
+    };
+
+    $('#startBtn').onclick = startTimer;
+    $('#timerCircle').onclick = ()=>{ isPaused = !isPaused; };
+
+    updateMainScreen();
+  </script>
+</body>
+</html>
