@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interval Timer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app" id="app">
+    <!-- QUAD GRID: 4 cerchi -->
+    <section class="quad" id="configView" aria-label="Impostazioni allenamento">
+      <div class="quad-grid">
+        <button class="clock-wrap bubble" id="prepBubble" data-key="prep" style="--size: 200px" aria-label="Imposta Prep">
+          <span class="chip-label">Prep</span>
+          <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" />
+            <circle class="ring" cx="100" cy="100" r="88" fill="none" stroke-linecap="round" />
+          </svg>
+          <div class="time-label" data-role="value">00:10</div>
+        </button>
+
+        <button class="clock-wrap bubble" id="workBubble" data-key="work" style="--size: 200px" aria-label="Imposta Work">
+          <span class="chip-label">Work</span>
+          <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" />
+            <circle class="ring" cx="100" cy="100" r="88" fill="none" stroke-linecap="round" />
+          </svg>
+          <div class="time-label" data-role="value">00:30</div>
+        </button>
+
+        <button class="clock-wrap bubble" id="restBubble" data-key="rest" style="--size: 200px" aria-label="Imposta Rest">
+          <span class="chip-label">Rest</span>
+          <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" />
+            <circle class="ring" cx="100" cy="100" r="88" fill="none" stroke-linecap="round" />
+          </svg>
+          <div class="time-label" data-role="value">00:15</div>
+        </button>
+
+        <button class="clock-wrap bubble" id="roundsBubble" data-key="rounds" style="--size: 200px" aria-label="Imposta Rounds">
+          <span class="chip-label">Rounds</span>
+          <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" />
+            <circle class="ring" cx="100" cy="100" r="88" fill="none" stroke-linecap="round" />
+          </svg>
+          <div class="time-label" data-role="value" id="roundsValue">08</div>
+        </button>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" class="btn primary">Avvia</button>
+      </div>
+    </section>
+
+    <!-- LIVE TIMER VIEW -->
+    <section id="liveView" class="live" hidden aria-label="Timer attivo">
+      <div class="phase-label" id="phaseLabel">PREP</div>
+
+      <div class="clock-wrap live-clock" id="liveClock" style="--size: 340px" role="status" aria-live="polite">
+        <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" />
+          <circle class="ring" id="liveRing" cx="100" cy="100" r="88" fill="none" stroke-linecap="round" />
+        </svg>
+        <div class="time-label" id="liveTime">00:30</div>
+      </div>
+
+      <div class="controls">
+        <button id="pauseBtn" class="btn secondary" hidden>Pausa</button>
+        <button id="resumeBtn" class="btn secondary" hidden>Riprendi</button>
+        <button id="stopBtn" class="btn secondary">Ferma</button>
+      </div>
+    </section>
+
+    <!-- OVERLAY / PICKER -->
+    <div id="pickerOverlay" class="overlay" hidden>
+      <div class="picker" role="dialog" aria-modal="true" aria-label="Selettore valori">
+        <header class="picker-header">
+          <h2 id="pickerTitle">Imposta tempo</h2>
+        </header>
+
+        <div class="wheels" id="wheels">
+          <div class="wheel-col" id="colMinutes">
+            <div class="wheel-label" id="labelMinutes">Minuti</div>
+            <div class="wheel" id="minutesWheel" tabindex="0" aria-label="Seleziona minuti"></div>
+          </div>
+          <div class="wheel-col" id="colSeconds">
+            <div class="wheel-label" id="labelSeconds">Secondi</div>
+            <div class="wheel" id="secondsWheel" tabindex="0" aria-label="Seleziona secondi"></div>
+          </div>
+        </div>
+
+        <footer class="picker-footer">
+          <button id="cancelPicker" class="btn">Annulla</button>
+          <button id="confirmPicker" class="btn primary">Conferma</button>
+        </footer>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
