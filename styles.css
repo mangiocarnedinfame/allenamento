@@ -41,7 +41,7 @@ body{
   gap:22px;
   align-items:center;
   justify-items:center;
-  margin-bottom:10px;
+  margin-bottom:24px;
 }
 .bubble{ position:relative; }
 .chip-label{
