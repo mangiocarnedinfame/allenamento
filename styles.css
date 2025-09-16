@@ -113,8 +113,12 @@ body{
 /* ======= Live view ======= */
 .live{ display:grid; gap:18px; place-items:center; }
 .live-clock .time-label{ font-size:52px; }
+.live .ring,
+.live .ring-bg{
+  stroke-width: 16px; /* prima 12px, alza finché ti piace */
+}
 .phase-label{
-  font-size:36px;
+  font-size:46px;
   font-weight:1000;
   letter-spacing:1.2px;
   color:#fff;
