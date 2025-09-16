@@ -32,9 +32,9 @@
   // State
   const state = {
     prep: 10,   // seconds
-    work: 30,
-    rest: 15,
-    rounds: 8,
+    work: 90,
+    rest: 60,
+    rounds: 3,
     activeKey: null
   };
 
@@ -56,7 +56,7 @@
   const r = 88;
   const circumference = 2 * Math.PI * r;
   liveRing.style.strokeDasharray = `${circumference} ${circumference}`;
-  liveRing.style.strokeDashoffset = `${circumference}`;
+  liveRing.style.strokeDashoffset = `0`;
 
   // --- Helpers
   function pad(n){ return String(n).padStart(2,'0'); }
@@ -312,9 +312,10 @@
     liveTime.textContent = fmt(secLeft);
 
     const elapsed = (totalSec * 1000 - msLeft) / 1000;
-    const progress = Math.min(1, Math.max(0, elapsed / totalSec));
-    const offset = circumference * (1 - progress);
+    const progress = Math.min(1, Math.max(0, elapsed / Math.max(1,totalSec)));
+    const offset = circumference * progress;   // cresce da 0 -> circumf
     liveRing.style.strokeDashoffset = `${offset}`;
+
   }
 
   // Init bubbles rings to a neutral color
