@@ -102,10 +102,10 @@ body{
   background: linear-gradient(90deg,var(--accent-start),var(--accent-mid));
   color:#041014;
   box-shadow: 0 22px 72px rgba(77,224,166,0.18);
-  padding:26px 40px;
-  font-size:22px;
-  border-radius:17px;
-  min-width:200px;
+  padding:21px 33px;
+  font-size:20px;
+  border-radius:16px;
+  min-width:160px;
   letter-spacing:0.6px;
 }
 .btn.secondary{ background: linear-gradient(90deg,#22262a,#191b1d); color:var(--muted); padding:16px 22px; font-size:16px; }
